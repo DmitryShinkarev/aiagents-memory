@@ -1,221 +1,467 @@
-# Memory-Agents Project Structure
+# Project Structure
+
+This document describes the structure of the Memory-Agents project and explains the purpose of each component.
+
+## Directory Structure
 
 ```
 memory-agents/
-│
-├── __init__.py                      # Главный модуль пакета
-├── LICENSE                          # MIT лицензия
-├── README.md                        # Основная документация
-├── QUICKSTART.md                    # Быстрый старт
-├── PROJECT_STRUCTURE.md             # Структура проекта (этот файл)
-├── requirements.txt                 # Python зависимости
-├── setup.py                         # Установочный скрипт
-├── Makefile                         # Команды для разработки
-├── docker-compose.yml               # Docker конфигурация
-│
-├── config/                          # Конфигурация
+├── api/                           # API Layer - Stable Contracts
 │   ├── __init__.py
-│   ├── settings.py                  # Настройки приложения (Pydantic)
-│   ├── prometheus.yml               # Конфигурация Prometheus
-│   └── memory/
-│       ├── __init__.py
-│       └── working_memory.py        # Конфигурация рабочей памяти
-│
-├── models/                          # Модели данных
-│   ├── __init__.py
-│   ├── memory/
+│   ├── contracts/                 # Pydantic DTOs for API contracts
 │   │   ├── __init__.py
-│   │   ├── episodic.py             # Модель эпизодической памяти
-│   │   ├── semantic.py             # Модель семантической памяти
-│   │   └── procedural.py           # Модель процедурной памяти
-│   └── logging/
+│   │   ├── common.py             # Common types and enums
+│   │   ├── entity.py             # Entity operation contracts
+│   │   ├── episode.py            # Episode operation contracts
+│   │   ├── facts.py              # Facts operation contracts
+│   │   └── knowledge.py          # Knowledge operation contracts
+│   └── versioning.py             # API version management
+├── business/                      # Business Logic Layer
+│   ├── __init__.py
+│   ├── idempotency.py            # Idempotency mechanisms
+│   └── validation.py             # Request validation
+├── domain/                        # Domain Layer - Core Services
+│   ├── __init__.py
+│   └── memory/                   # Memory type services
 │       ├── __init__.py
-│       └── event_log.py            # Модель логирования событий
-│
-├── storage/                         # Слой хранения данных
+│       ├── episodic.py           # Episodic memory service
+│       ├── facts.py              # User facts service
+│       ├── procedural.py         # Procedural memory service
+│       ├── semantic.py           # Semantic memory service
+│       └── working.py            # Working memory service
+├── services/                      # Services Layer - High-level Services
 │   ├── __init__.py
-│   ├── redis/
-│   │   ├── __init__.py
-│   │   └── working_store.py        # Реализация рабочей памяти (Redis)
-│   ├── mongodb/
-│   │   ├── __init__.py
-│   │   ├── episodic_store.py       # Эпизодическая память (MongoDB)
-│   │   ├── semantic_store.py       # Семантическая память (MongoDB+Qdrant)
-│   │   └── procedural_store.py     # Процедурная память (MongoDB)
-│   └── postgresql/
+│   └── memory_facade.py          # Unified memory interface
+├── storage/                       # Storage Layer - Database Clients
+│   ├── __init__.py
+│   └── clients/                  # Database client implementations
 │       ├── __init__.py
-│       └── event_logger.py         # Логирование событий (PostgreSQL)
-│
-├── core/                            # Ядро системы
+│       ├── mongo_client.py       # MongoDB client
+│       ├── postgres_client.py    # PostgreSQL client
+│       ├── qdrant_client.py      # Qdrant client
+│       └── redis_client.py       # Redis client
+├── config/                        # Configuration
 │   ├── __init__.py
-│   └── memory_orchestrator.py      # Центральный оркестратор памяти
-│
-├── utils/                           # Утилиты
+│   ├── prometheus.yml            # Prometheus configuration
+│   └── settings.py               # Application settings
+├── examples/                      # Usage Examples
 │   ├── __init__.py
-│   ├── cache.py                    # Кэширование запросов
-│   └── initialization.py           # Инициализация системы
-│
-├── metrics/                         # Мониторинг и метрики
-│   ├── __init__.py
-│   └── memory_metrics.py           # Prometheus метрики
-│
-├── examples/                        # Примеры использования
-│   ├── __init__.py
-│   └── basic_usage.py              # Базовый пример
-│
-├── tests/                           # Тесты
-│   ├── __init__.py
-│   ├── conftest.py                 # Pytest конфигурация
-│   └── test_working_memory.py      # Тесты рабочей памяти
-│
-├── scripts/                         # Вспомогательные скрипты
-│   ├── mongo-init.js               # Инициализация MongoDB
-│   └── postgres-init.sql           # Инициализация PostgreSQL
-│
-└── docs/                            # Документация
-    ├── ARCHITECTURE.md              # Архитектура системы
-    └── GETTING_STARTED.md           # Руководство по началу работы
+│   └── memory_usage_example.py   # Basic usage example
+├── docs/                          # Documentation
+│   ├── ARCHITECTURE.md           # System architecture
+│   ├── API_REFERENCE.md          # API documentation
+│   ├── DEPLOYMENT.md             # Deployment guide
+│   ├── EXAMPLES.md               # Usage examples
+│   ├── GETTING_STARTED.md        # Getting started guide
+│   ├── PROJECT_STRUCTURE.md      # This file
+│   └── QUICKSTART.md             # Quick start guide
+├── scripts/                       # Database Initialization
+│   ├── mongo-init.js             # MongoDB initialization
+│   └── postgres-init.sql         # PostgreSQL initialization
+├── __init__.py                    # Main package entry point
+├── docker-compose.yml             # Docker Compose configuration
+├── LICENSE                        # MIT License
+├── Makefile                       # Build and development commands
+├── README.md                      # Main README
+├── README_EN.md                   # English README
+├── requirements.txt               # Python dependencies
+└── setup.py                       # Package setup
 ```
 
-## Ключевые компоненты
+## Layer Descriptions
 
-### 🎯 Core Components
+### API Layer (`api/`)
 
-1. **MemoryOrchestrator** (`core/memory_orchestrator.py`)
-   - Центральный координатор всех типов памяти
-   - Поиск контекста с приоритизацией
-   - Консолидация сессий
-   - Периодическое обслуживание
+The API layer provides stable, versioned contracts for all memory operations.
 
-2. **Working Memory** (`storage/redis/working_store.py`)
-   - Redis-based кратковременная память
-   - Управление сессиями и контекстом
-   - Временные переменные с TTL
-   - Автоматическое сжатие
+#### `api/contracts/`
+- **`common.py`**: Common types, enums, and base classes used across all contracts
+- **`entity.py`**: Contracts for dynamic entity operations (create, read, update, delete)
+- **`episode.py`**: Contracts for episodic memory operations
+- **`facts.py`**: Contracts for user facts operations
+- **`knowledge.py`**: Contracts for semantic knowledge operations
 
-3. **Episodic Memory** (`storage/mongodb/episodic_store.py`)
-   - Хранение истории взаимодействий
-   - Векторный поиск эпизодов
-   - Оценка важности и релевантности
-   - Временной decay
+#### `api/versioning.py`
+- API version management and backward compatibility
 
-4. **Semantic Memory** (`storage/mongodb/semantic_store.py`)
-   - Гибридное хранилище знаний (MongoDB + Qdrant)
-   - Семантический и текстовый поиск
-   - Версионирование знаний
-   - Статистика доступа
+### Business Logic Layer (`business/`)
 
-5. **Procedural Memory** (`storage/mongodb/procedural_store.py`)
-   - Хранение процедур и шаблонов
-   - Метрики производительности
-   - Отслеживание успешности
-   - Автоматическая деактивация неиспользуемых
+The business logic layer implements core business rules and cross-cutting concerns.
 
-6. **Event Logger** (`storage/postgresql/event_logger.py`)
-   - Аудит всех операций
-   - Аналитика производительности
-   - Трассировка ошибок
-   - Отчеты по использованию ресурсов
+#### `business/idempotency.py`
+- **`IdempotencyGuard`**: Ensures operations are executed only once
+- **`@idempotent_operation`**: Decorator for idempotent operations
+- Collision detection and response caching
 
-### 📊 Data Models
+#### `business/validation.py`
+- **`RequestValidator`**: Validates incoming requests against business rules
+- Schema validation and access control validation
 
-- **Episode**: Эпизод взаимодействия с метаданными
-- **SemanticKnowledge**: Факт или знание с embedding
-- **Procedure**: Процедура или шаблон
-- **EventLog**: Событие для логирования
+### Domain Layer (`domain/`)
 
-### 🛠️ Utilities
+The domain layer contains the core memory services that implement business logic.
 
-- **QueryCache**: Кэширование частых запросов в Redis
-- **initialize_memory_system**: Упрощенная инициализация
-- **memory_metrics**: Prometheus метрики
+#### `domain/memory/`
+- **`working.py`**: Working memory service (Redis-based)
+- **`episodic.py`**: Episodic memory service (MongoDB + Qdrant)
+- **`semantic.py`**: Semantic memory service (MongoDB + Qdrant)
+- **`procedural.py`**: Procedural memory service (MongoDB)
+- **`facts.py`**: User facts service (MongoDB)
 
-### 🐳 Infrastructure
+### Services Layer (`services/`)
 
-- **Redis**: Рабочая память и кэш
-- **MongoDB**: Долговременная память
-- **Qdrant**: Векторный поиск
-- **PostgreSQL**: Логирование и аналитика
+The services layer provides high-level services that orchestrate domain services.
 
-## Паттерны и принципы
+#### `services/memory_facade.py`
+- **`MemoryFacade`**: Unified interface for all memory operations
+- **`get_memory_facade()`**: Factory function for memory facade
 
-### Cognitive Architecture
-- Working Memory: Активный контекст
-- Episodic Memory: Прошлый опыт
-- Semantic Memory: Факты и знания
-- Procedural Memory: Навыки и процедуры
+### Storage Layer (`storage/`)
 
-### Design Patterns
-- **Pattern 4.4 RAG**: Retrieval-Augmented Generation
-- **Pattern 4.9 Self-reflection**: Консолидация сессий
-- **Pattern 4.10 Cross-reflection**: Общая память агентов
-- **Pattern 4.11 Human reflection**: Обратная связь
+The storage layer provides database clients and connection management.
 
-### Best Practices
-- Async/await для всех I/O операций
-- Connection pooling для БД
-- TTL для автоматической очистки
-- Индексы для быстрого поиска
-- Версионирование знаний
-- Метрики для мониторинга
+#### `storage/clients/`
+- **`redis_client.py`**: Redis client with connection pooling
+- **`mongo_client.py`**: MongoDB client with connection pooling
+- **`qdrant_client.py`**: Qdrant client for vector operations
+- **`postgres_client.py`**: PostgreSQL client for audit logging
 
-## Масштабирование
+### Configuration (`config/`)
 
-### Horizontal Scaling
-- MongoDB sharding по `agent_id`
-- Redis Cluster для распределенного кэша
-- Qdrant кластер для векторного поиска
+Configuration management and application settings.
 
-### Vertical Optimization
-- Lua скрипты для атомарных операций
-- Составные индексы в MongoDB
-- Кэширование результатов запросов
-- Партиционирование логов по времени
+#### `config/settings.py`
+- **`Settings`**: Pydantic settings for environment variables
+- **`get_settings()`**: Factory function for settings
 
-## Workflow
+### Examples (`examples/`)
 
-### Типичный сценарий использования:
+Usage examples and demonstrations.
 
-1. **Инициализация**: `initialize_memory_system()`
-2. **Активная работа**: Сообщения в Working Memory
-3. **Поиск контекста**: `retrieve_context()` из всех типов памяти
-4. **Консолидация**: `consolidate_session()` в long-term memory
-5. **Обслуживание**: `periodic_maintenance()` по расписанию
+#### `examples/memory_usage_example.py`
+- Basic usage example showing all memory types
+- Multi-agent coordination example
+- Health monitoring example
 
-## Зависимости
+### Documentation (`docs/`)
 
-### Production
-- redis 5.0+
-- motor 3.3+
-- pymongo 4.6+
-- qdrant-client 1.7+
-- asyncpg 0.29+
-- pydantic 2.5+
+Comprehensive documentation for the system.
 
-### Development
-- pytest 7.4+
-- pytest-asyncio 0.21+
-- black 23.12+
-- ruff 0.1+
-- mypy 1.8+
+- **`ARCHITECTURE.md`**: System architecture and design
+- **`API_REFERENCE.md`**: Detailed API documentation
+- **`DEPLOYMENT.md`**: Production deployment guide
+- **`EXAMPLES.md`**: Comprehensive usage examples
+- **`GETTING_STARTED.md`**: Getting started guide
+- **`PROJECT_STRUCTURE.md`**: This file
+- **`QUICKSTART.md`**: Quick start guide
 
-## Метрики
+### Scripts (`scripts/`)
 
-### Prometheus Metrics
-- `memory_operations_total`: Счетчик операций
-- `memory_operation_latency_seconds`: Латентность
-- `memory_size_bytes`: Размер памяти
-- `cache_hits_total`: Попадания в кэш
+Database initialization and setup scripts.
 
-## Лицензия
+- **`mongo-init.js`**: MongoDB database and collection setup
+- **`postgres-init.sql`**: PostgreSQL database and table setup
 
-MIT License - см. LICENSE файл
+## Key Files
 
-## Версия
+### `__init__.py` (Root)
+Main package entry point that exposes the public API:
 
-0.1.0 - Initial Release
+```python
+# Core services
+from .services.memory_facade import MemoryFacade, get_memory_facade
+from .config.settings import Settings, get_settings
 
+# API contracts
+from .api.contracts.common import *
+from .api.contracts.entity import *
+from .api.contracts.episode import *
+from .api.contracts.knowledge import *
+from .api.contracts.facts import *
 
+# Business logic
+from .business.idempotency import IdempotencyGuard, idempotent_operation
+from .business.validation import RequestValidator, ValidationError
 
+# Domain services
+from .domain.memory.working import WorkingMemoryService
+from .domain.memory.episodic import EpisodicMemoryService
+from .domain.memory.semantic import SemanticMemoryService
+from .domain.memory.procedural import ProceduralMemoryService
+from .domain.memory.facts import FactsService
 
+# Storage clients
+from .storage.clients.redis_client import RedisClient
+from .storage.clients.mongo_client import MongoClient
+from .storage.clients.qdrant_client import QdrantClient
+from .storage.clients.postgres_client import PostgresClient
+```
 
+### `requirements.txt`
+Python dependencies for the project:
+
+```
+# Core dependencies
+redis>=5.0.0
+motor>=3.3.0
+pymongo>=4.6.0
+qdrant-client>=1.7.0
+asyncpg>=0.29.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+aiofiles>=23.2.0
+asyncio-mqtt>=0.16.0
+prometheus-client>=0.19.0
+opentelemetry-api>=1.21.0
+opentelemetry-sdk>=1.21.0
+python-dotenv>=1.0.0
+pyyaml>=6.0.1
+click>=8.1.0
+numpy>=1.24.0
+sentence-transformers>=2.2.0
+
+# Development dependencies
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+black>=23.0.0
+ruff>=0.1.0
+mypy>=1.7.0
+```
+
+### `docker-compose.yml`
+Docker Compose configuration for local development:
+
+```yaml
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+  
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+  
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+  
+  postgresql:
+    image: postgres:16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: memory_logs
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+```
+
+### `Makefile`
+Build and development commands:
+
+```makefile
+.PHONY: install test lint format type-check clean
+
+install:
+	pip install -r requirements.txt
+
+test:
+	pytest
+
+lint:
+	ruff check .
+
+format:
+	black .
+
+type-check:
+	mypy .
+
+clean:
+	find . -type f -name "*.pyc" -delete
+	find . -type d -name "__pycache__" -delete
+```
+
+## Design Patterns
+
+### Layered Architecture
+The project follows a layered architecture pattern:
+
+1. **API Layer**: Stable contracts and versioning
+2. **Business Logic Layer**: Cross-cutting concerns and business rules
+3. **Domain Layer**: Core business logic and services
+4. **Services Layer**: High-level orchestration
+5. **Storage Layer**: Database clients and connection management
+
+### Dependency Injection
+Services are injected through factory functions:
+
+```python
+# Factory function for memory facade
+def get_memory_facade() -> MemoryFacade:
+    return MemoryFacade()
+
+# Factory function for settings
+def get_settings() -> Settings:
+    return Settings()
+```
+
+### Repository Pattern
+Storage clients implement the repository pattern:
+
+```python
+class MongoClient:
+    async def insert_one(self, collection: str, document: dict) -> str:
+        # Implementation
+    
+    async def find_one(self, collection: str, filter: dict) -> Optional[dict]:
+        # Implementation
+```
+
+### Facade Pattern
+The `MemoryFacade` provides a unified interface to all memory services:
+
+```python
+class MemoryFacade:
+    def __init__(self):
+        self.working = WorkingMemoryService()
+        self.episodic = EpisodicMemoryService()
+        self.semantic = SemanticMemoryService()
+        self.procedural = ProceduralMemoryService()
+        self.facts = FactsService()
+```
+
+## Development Workflow
+
+### 1. Local Development
+```bash
+# Clone repository
+git clone https://github.com/your-org/memory-agents.git
+cd memory-agents
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Start dependencies
+docker-compose up -d
+
+# Run tests
+pytest
+
+# Run linting
+ruff check .
+
+# Run type checking
+mypy .
+```
+
+### 2. Adding New Features
+1. Create feature branch
+2. Implement changes following the layered architecture
+3. Add tests
+4. Update documentation
+5. Submit pull request
+
+### 3. Code Organization
+- Follow the layered architecture
+- Use dependency injection
+- Implement proper error handling
+- Add comprehensive logging
+- Write tests for all new code
+
+## Testing Strategy
+
+### Unit Tests
+- Test individual components in isolation
+- Mock external dependencies
+- Test error conditions
+
+### Integration Tests
+- Test component interactions
+- Test database operations
+- Test API endpoints
+
+### End-to-End Tests
+- Test complete workflows
+- Test multi-agent scenarios
+- Test performance characteristics
+
+## Documentation Strategy
+
+### Code Documentation
+- Docstrings for all public methods
+- Type hints for all parameters and return values
+- Inline comments for complex logic
+
+### API Documentation
+- Comprehensive API reference
+- Usage examples
+- Error handling documentation
+
+### Architecture Documentation
+- System design documents
+- Deployment guides
+- Performance characteristics
+
+## Security Considerations
+
+### Data Protection
+- Encryption in transit and at rest
+- Access control and authentication
+- Audit logging for all operations
+
+### Privacy
+- User data isolation
+- TTL for automatic cleanup
+- Consent management
+
+### Compliance
+- GDPR compliance
+- Data retention policies
+- Right to be forgotten
+
+## Performance Considerations
+
+### Latency
+- Target latencies for each memory type
+- Connection pooling
+- Query optimization
+
+### Throughput
+- Concurrent operation support
+- Batch operations
+- Caching strategies
+
+### Scalability
+- Horizontal scaling support
+- Database sharding
+- Load balancing
+
+## Monitoring and Observability
+
+### Health Checks
+- Service availability monitoring
+- Database connectivity checks
+- Performance metrics
+
+### Logging
+- Structured logging
+- Request tracing
+- Error tracking
+
+### Metrics
+- Prometheus metrics
+- Custom business metrics
+- Performance indicators

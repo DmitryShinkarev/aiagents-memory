@@ -1,316 +1,518 @@
-# Getting Started with Memory-Agents
+# Getting Started
 
-## Installation
+This guide will help you understand the Memory-Agents system and get started with building memory-aware AI agents.
 
-### Prerequisites
+## What is Memory-Agents?
 
-- Python 3.11 or higher
-- Docker and Docker Compose (for infrastructure)
-- Git
+Memory-Agents is a comprehensive memory management system for multi-agent AI systems that implements four cognitive memory types inspired by human memory systems:
 
-### Quick Install
+- **Working Memory**: Short-term operational memory for active sessions
+- **Episodic Memory**: Long-term memory for specific events and interactions
+- **Semantic Memory**: Generalized knowledge with vector search and temporal decay
+- **Procedural Memory**: Skills, procedures, and executable code
+- **User Facts**: Personal information with full version history
+
+## Key Features
+
+- 🧠 **Human-like Memory**: Four cognitive memory types
+- 🔒 **Stable API Contracts**: Versioned, backward-compatible interfaces
+- ⚡ **Idempotent Operations**: Safe retry mechanisms
+- 🕒 **Temporal Decay**: Knowledge naturally ages over time
+- 👥 **Multi-Agent Support**: Isolated memory spaces with controlled sharing
+- 🔍 **Vector Search**: High-performance semantic search
+- 📊 **Health Monitoring**: Comprehensive metrics and health checks
+- 🔄 **Real-time Coordination**: Pub/Sub messaging between agents
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    API Layer (Stable Contracts)             │
+│  • UniversalEntityWriteRequest                             │
+│  • UniversalEpisodeWriteRequest                            │
+│  • UniversalKnowledgeWriteRequest                          │
+│  • Versioned APIs with backward compatibility              │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────────────┐
+│              Business Logic Layer                           │
+│  • IdempotencyGuard with collision detection               │
+│  • RequestValidator with business rules                    │
+│  • Contract adapters between layers                        │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────────────┐
+│                 Domain Layer                                │
+│  • WorkingMemoryService (Redis)                            │
+│  • EpisodicMemoryService (MongoDB + Qdrant)                │
+│  • SemanticMemoryService (MongoDB + Qdrant)                │
+│  • ProceduralMemoryService (MongoDB)                       │
+│  • FactsService (MongoDB)                                  │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────────────┐
+│                Storage Layer                                │
+│  • Redis (Working Memory, Cache, Pub/Sub)                  │
+│  • MongoDB (Long-term Memory, Documents)                   │
+│  • Qdrant (Vector Search, Embeddings)                      │
+│  • PostgreSQL (Audit Logs, Metrics)                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Quick Start
+
+### 1. Installation
 
 ```bash
-# Clone repository
-git clone https://github.com/yourusername/memory-agents.git
+git clone https://github.com/your-org/memory-agents.git
 cd memory-agents
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Or install as package
-pip install -e .
 ```
 
-## Infrastructure Setup
-
-### Using Docker (Recommended)
+### 2. Start Dependencies
 
 ```bash
-# Start all services
 docker-compose up -d
-
-# Verify services are running
-docker-compose ps
-
-# View logs
-docker-compose logs -f
 ```
 
-This starts:
-- Redis (port 6379)
-- MongoDB (port 27017)
-- Qdrant (ports 6333, 6334)
-- PostgreSQL (port 5432)
+### 3. Configure Environment
 
-### Manual Setup
-
-If you prefer manual setup, install and configure:
-
-1. **Redis 7.x**
-   ```bash
-   redis-server --port 6379
-   ```
-
-2. **MongoDB 7.x**
-   ```bash
-   mongod --port 27017
-   ```
-
-3. **Qdrant**
-   ```bash
-   docker run -p 6333:6333 qdrant/qdrant
-   ```
-
-4. **PostgreSQL 16.x**
-   ```bash
-   psql -U postgres -c "CREATE DATABASE memory_logs;"
-   ```
-
-## Configuration
-
-### Environment Variables
-
-Copy the example configuration:
+Create `.env` file:
 
 ```bash
-cp .env.example .env
-```
-
-Edit `.env` with your settings:
-
-```env
-# Redis
 REDIS_URL=redis://localhost:6379
-
-# MongoDB
 MONGODB_URL=mongodb://localhost:27017
-MONGODB_DATABASE=agent_memory
-
-# Qdrant
 QDRANT_URL=http://localhost:6333
-
-# PostgreSQL
 POSTGRES_URL=postgresql://postgres:password@localhost:5432/memory_logs
-
-# Embedding Service (if using OpenAI)
-EMBEDDING_PROVIDER=openai
-OPENAI_API_KEY=your_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
 ```
 
-## Basic Usage
-
-### Initialize the System
+### 4. Basic Usage
 
 ```python
-from memory_agents import initialize_memory_system
+import asyncio
+from memory_agents import get_memory_facade
 
-# Initialize with default configuration
-orchestrator = await initialize_memory_system(agent_id="my_agent")
+async def main():
+    memory = get_memory_facade()
+    
+    # Create an episode
+    await memory.create_episode(
+        episode_id="ep_001",
+        context={"agent_id": "agent_001", "user_id": "user_123"},
+        scope="user_private",
+        episode_type="interaction",
+        title="User interaction",
+        trajectory=[{
+            "step_id": "1",
+            "timestamp": "2024-01-01T10:00:00Z",
+            "role": "user",
+            "action": "message",
+            "content": "Hello"
+        }],
+        success=True,
+        importance=0.5
+    )
+    
+    # Get context
+    context = await memory.retrieve_comprehensive_context(
+        agent_id="agent_001",
+        user_id="user_123"
+    )
+    
+    print(f"Retrieved context with {len(context.get('episodes', []))} episodes")
+
+asyncio.run(main())
 ```
 
-### Working Memory Example
+## Memory Types Deep Dive
+
+### Working Memory
+
+Working memory is your agent's short-term operational buffer, similar to human working memory.
+
+**Use Cases**:
+- Active conversation context
+- Session state management
+- Temporary variable storage
+- Multi-agent coordination
+
+**Example**:
+```python
+# Store session data
+await memory.working.store_session("session_001", {
+    "current_message": "User needs help",
+    "conversation_history": [...],
+    "temporary_variables": {"user_tier": "premium"}
+})
+
+# Get context
+context = await memory.working.get_context("agent_001", "session_001")
+```
+
+### Episodic Memory
+
+Episodic memory stores specific events and interactions, like human episodic memory.
+
+**Use Cases**:
+- Historical context retrieval
+- Pattern recognition
+- Experience replay
+- Few-shot learning
+
+**Example**:
+```python
+# Create episode
+await memory.create_episode(
+    episode_id="ep_001",
+    context={"agent_id": "agent_001", "user_id": "user_123"},
+    scope="user_private",
+    episode_type="interaction",
+    title="User support call",
+    trajectory=[...],
+    success=True,
+    importance=0.8
+)
+
+# Query episodes
+episodes = await memory.query_episodes(
+    filter_by_agent_id="agent_001",
+    filter_by_user_id="user_123",
+    min_importance=0.5,
+    limit=10
+)
+```
+
+### Semantic Memory
+
+Semantic memory stores generalized knowledge with vector search and temporal decay.
+
+**Use Cases**:
+- RAG (Retrieval-Augmented Generation)
+- Knowledge base queries
+- Fact checking
+- Contextual knowledge retrieval
+
+**Example**:
+```python
+# Store knowledge
+await memory.create_knowledge(
+    knowledge_id="kb_001",
+    knowledge="Premium users have priority support",
+    source="system",
+    confidence=1.0,
+    agent_id="agent_001"
+)
+
+# Semantic search
+knowledge_items = await memory.semantic_search(
+    query_embedding=[0.1, 0.2, ...],  # Your embedding vector
+    agent_id="agent_001",
+    limit=10
+)
+```
+
+### Procedural Memory
+
+Procedural memory stores skills, procedures, and executable code.
+
+**Use Cases**:
+- Code execution
+- Skill management
+- Workflow automation
+- Performance optimization
+
+**Example**:
+```python
+# Store procedure
+await memory.procedural.store_procedure(
+    procedure_id="proc_001",
+    name="resolve_billing_issue",
+    description="Resolve billing issues",
+    code="def resolve_billing_issue(account): ...",
+    language="python"
+)
+
+# Execute procedure
+result = await memory.procedural.execute_procedure(
+    name="resolve_billing_issue",
+    parameters={"account": "12345"}
+)
+```
+
+### User Facts
+
+User facts store personal information with full version history and conflict resolution.
+
+**Use Cases**:
+- User profile management
+- Personalization
+- Preference tracking
+- Relationship management
+
+**Example**:
+```python
+# Store fact
+await memory.facts.store_fact(
+    fact_id="fact_001",
+    user_id="user_123",
+    fact_type="personal",
+    key="name",
+    value="John Doe",
+    confidence=1.0,
+    source="user_stated"
+)
+
+# Get user profile
+profile = await memory.facts.get_user_profile("user_123")
+```
+
+## Multi-Agent Coordination
+
+Memory-Agents supports multiple agents working together through pub/sub messaging.
+
+**Example**:
+```python
+# Agent 1 publishes a task
+await memory.working.publish_event(
+    channel="task:analysis",
+    message={
+        "task_id": "task_001",
+        "type": "analyze_billing_issue",
+        "data": {"user_id": "user_123", "issue": "duplicate charge"}
+    }
+)
+
+# Agent 2 subscribes to the task
+events = await memory.working.subscribe_events(
+    channels=["task:analysis"],
+    timeout=10
+)
+
+# Agent 3 gets the results
+results = await memory.working.get_task_results("task_001", timeout=30)
+```
+
+## Access Control
+
+Memory-Agents provides granular access control through memory scopes:
+
+- **USER_PRIVATE**: Only accessible to the user
+- **AGENT_PRIVATE**: Only accessible to the agent
+- **TEAM_SHARED**: Accessible within the team
+- **CROSS_TEAM**: Accessible across teams
+- **ORGANIZATION**: Organization-wide access
+- **PUBLIC**: Publicly accessible
+
+**Example**:
+```python
+# Create episode with specific scope
+await memory.create_episode(
+    episode_id="ep_001",
+    context={"agent_id": "agent_001", "user_id": "user_123"},
+    scope="user_private",  # Only accessible to the user
+    # ... other parameters
+)
+
+# Create knowledge with team access
+await memory.create_knowledge(
+    knowledge_id="kb_001",
+    knowledge="Team best practices",
+    source="system",
+    confidence=1.0,
+    agent_id="agent_001",
+    access_scope="team_shared",
+    allowed_teams=["team_001", "team_002"]
+)
+```
+
+## Idempotent Operations
+
+All write operations are idempotent, meaning they can be safely retried without side effects.
+
+**Example**:
+```python
+# Create episode with idempotency key
+idempotency_key = "create_episode_001"
+
+# First call - creates the episode
+result1 = await memory.create_episode(
+    episode_id="ep_001",
+    # ... parameters
+    idempotency_key=idempotency_key
+)
+
+# Second call with same idempotency key - returns cached result
+result2 = await memory.create_episode(
+    episode_id="ep_001",
+    # ... same parameters
+    idempotency_key=idempotency_key
+)
+
+# Both calls return the same result
+assert result1 == result2
+```
+
+## Health Monitoring
+
+Memory-Agents provides comprehensive health monitoring and metrics.
+
+**Example**:
+```python
+# Health check
+health = await memory.health_check()
+print(f"System status: {health['status']}")
+print(f"Working memory: {health['services']['working_memory']['status']}")
+
+# Get metrics
+metrics = await memory.get_metrics()
+print(f"Active sessions: {metrics['working_memory']['active_sessions']}")
+print(f"Total episodes: {metrics['episodic_memory']['total_episodes']}")
+print(f"Total knowledge: {metrics['semantic_memory']['total_knowledge']}")
+```
+
+## Best Practices
+
+### 1. Use Appropriate Memory Types
+
+- **Working Memory**: For active sessions and temporary data
+- **Episodic Memory**: For specific events and interactions
+- **Semantic Memory**: For generalized knowledge and facts
+- **Procedural Memory**: For skills and executable code
+- **User Facts**: For personal information and preferences
+
+### 2. Set Appropriate Scopes
+
+- Use `user_private` for user-specific data
+- Use `agent_private` for agent-specific data
+- Use `team_shared` for team collaboration
+- Use `organization` for organization-wide data
+
+### 3. Use Idempotency Keys
+
+Always use idempotency keys for write operations to ensure safe retries.
+
+### 4. Monitor Performance
+
+- Check health status regularly
+- Monitor metrics and logs
+- Set up alerting for critical issues
+
+### 5. Handle Errors Gracefully
+
+- Implement proper error handling
+- Use retry mechanisms
+- Log errors for debugging
+
+## Common Patterns
+
+### 1. Context-Aware Responses
 
 ```python
-# Add messages to active session
-session_id = "session_001"
-
-await orchestrator.working.add_message(
-    session_id=session_id,
-    role="user",
-    content="What is multi-agent systems?"
-)
-
-await orchestrator.working.add_message(
-    session_id=session_id,
-    role="assistant",
-    content="Multi-agent systems are..."
-)
-
-# Retrieve conversation context
-context = await orchestrator.working.get_context(session_id)
-print(f"Messages: {len(context)}")
-
-# Set temporary variables
-await orchestrator.working.set_temp_variable(
-    session_id, "current_topic", "multi-agent-systems"
-)
+async def get_context_aware_response(agent_id, user_id, message):
+    # Get comprehensive context
+    context = await memory.retrieve_comprehensive_context(
+        agent_id=agent_id,
+        user_id=user_id
+    )
+    
+    # Use context to generate response
+    episodes = context.get("episodes", [])
+    knowledge = context.get("knowledge", [])
+    facts = context.get("facts", [])
+    
+    # Generate response based on context
+    if episodes:
+        return f"I remember our previous conversation. {message}"
+    elif knowledge:
+        return f"Based on my knowledge, {message}"
+    else:
+        return f"I understand. {message}"
 ```
 
-### Context Retrieval
+### 2. Learning from Interactions
 
 ```python
-# Get comprehensive context from all memory types
-context = await orchestrator.retrieve_context(
-    agent_id="my_agent",
-    session_id="session_001",
-    query="What did we discuss about agents?",
-    max_tokens=4096
-)
-
-print(f"Working memory: {len(context['working'])} items")
-print(f"Episodic memory: {len(context['episodic'])} items")
-print(f"Semantic memory: {len(context['semantic'])} items")
-print(f"Total tokens: {context['total_tokens']}")
+async def learn_from_interaction(agent_id, user_id, interaction):
+    # Store the interaction as an episode
+    await memory.create_episode(
+        episode_id=f"ep_{int(time.time())}",
+        context={"agent_id": agent_id, "user_id": user_id},
+        scope="user_private",
+        episode_type="interaction",
+        title="User interaction",
+        trajectory=interaction["trajectory"],
+        success=interaction["success"],
+        importance=interaction["importance"]
+    )
+    
+    # Extract knowledge if important
+    if interaction["importance"] > 0.8:
+        await memory.create_knowledge(
+            knowledge_id=f"kb_{int(time.time())}",
+            knowledge=interaction["summary"],
+            source="inferred",
+            confidence=0.8,
+            agent_id=agent_id
+        )
 ```
 
-### Session Consolidation
+### 3. Multi-Agent Collaboration
 
 ```python
-# Move session from working memory to long-term memory
-await orchestrator.consolidate_session(
-    agent_id="my_agent",
-    session_id="session_001"
-)
-
-print("Session consolidated to long-term memory!")
+async def collaborate_on_task(agents, task):
+    # Publish task to all agents
+    await memory.working.publish_event(
+        channel="task:collaboration",
+        message={
+            "task_id": task["id"],
+            "type": task["type"],
+            "data": task["data"],
+            "assigned_agents": agents
+        }
+    )
+    
+    # Collect results from all agents
+    results = []
+    for agent in agents:
+        result = await memory.working.get_task_results(
+            task["id"], 
+            timeout=30
+        )
+        results.append(result)
+    
+    # Consolidate results
+    consolidated_result = consolidate_results(results)
+    
+    # Store consolidated result
+    await memory.create_knowledge(
+        knowledge_id=f"kb_consolidated_{task['id']}",
+        knowledge=consolidated_result,
+        source="consolidated",
+        confidence=0.9,
+        agent_id="system"
+    )
+    
+    return consolidated_result
 ```
-
-### Adding Knowledge
-
-```python
-from memory_agents import SemanticKnowledge, KnowledgeType
-
-# Create knowledge item
-knowledge = SemanticKnowledge(
-    content="Redis is an in-memory data store",
-    knowledge_type=KnowledgeType.FACT,
-    source="documentation",
-    namespace="technical",
-    tags=["redis", "database"],
-    confidence=1.0
-)
-
-# Add to semantic memory (requires embedding service)
-# embedding = await embedding_service.embed(knowledge.content)
-# await orchestrator.semantic.add_knowledge(knowledge, embedding)
-```
-
-### Adding Procedures
-
-```python
-from memory_agents import Procedure, ProcedureType, ProcedureParameter
-
-# Create procedure template
-procedure = Procedure(
-    name="greeting_template",
-    procedure_type=ProcedureType.PROMPT_TEMPLATE,
-    description="Friendly greeting template",
-    content="Hello {name}! Welcome to {service}.",
-    parameters=[
-        ProcedureParameter(name="name", type="string", required=True),
-        ProcedureParameter(name="service", type="string", required=True)
-    ],
-    tags=["greeting", "template"]
-)
-
-# Save procedure
-proc_id = await orchestrator.procedural.save_procedure(procedure)
-print(f"Saved procedure: {proc_id}")
-```
-
-## Running Examples
-
-```bash
-# Run basic usage example
-python examples/basic_usage.py
-
-# Or using Make
-make run-example
-```
-
-## Testing
-
-```bash
-# Run all tests
-pytest
-
-# With coverage
-pytest --cov=memory_agents --cov-report=html
-
-# Or using Make
-make test
-```
-
-## Monitoring
-
-### Prometheus Metrics
-
-Start metrics server in your application:
-
-```python
-from metrics import start_metrics_server
-
-# Start on port 8000
-start_metrics_server(8000)
-```
-
-Access metrics at: `http://localhost:8000/metrics`
-
-### Grafana Dashboard
-
-If you started monitoring services:
-
-```bash
-docker-compose --profile monitoring up -d
-```
-
-Access Grafana at: `http://localhost:3000` (admin/admin)
 
 ## Next Steps
 
-- Read [Architecture Documentation](./ARCHITECTURE.md)
-- Explore [API Reference](./API.md)
-- Check out [Advanced Examples](../examples/)
-- Review [Performance Tuning](./PERFORMANCE.md)
-
-## Troubleshooting
-
-### Redis Connection Issues
-
-```bash
-# Check Redis is running
-redis-cli ping
-
-# Should return: PONG
-```
-
-### MongoDB Connection Issues
-
-```bash
-# Check MongoDB is running
-mongosh --eval "db.adminCommand('ping')"
-```
-
-### Qdrant Connection Issues
-
-```bash
-# Check Qdrant health
-curl http://localhost:6333/health
-```
-
-### PostgreSQL Connection Issues
-
-```bash
-# Check PostgreSQL is running
-psql -U postgres -c "SELECT version();"
-```
+1. **Explore Examples**: Check out [Examples](EXAMPLES.md) for comprehensive usage examples
+2. **Read API Reference**: See [API Reference](API_REFERENCE.md) for detailed API documentation
+3. **Deploy to Production**: Follow the [Deployment Guide](DEPLOYMENT.md) for production setup
+4. **Understand Architecture**: Read [Architecture](ARCHITECTURE.md) for system design details
 
 ## Getting Help
 
-- GitHub Issues: Report bugs or request features
-- Documentation: Check docs/ directory
-- Examples: See examples/ directory
+- 📖 **Documentation**: [docs/](docs/)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/your-org/memory-agents/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/your-org/memory-agents/discussions)
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ## License
 
-MIT License - see LICENSE file for details
-
-
-
-
-
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

@@ -1,228 +1,373 @@
-# Memory-Agents Quick Start
+# Quick Start Guide
 
-## 🚀 Быстрый старт за 5 минут
+Get up and running with Memory-Agents in minutes.
 
-### 1. Запуск инфраструктуры
+## Prerequisites
+
+- Python 3.10+
+- Docker and Docker Compose
+- OpenAI API key (for embeddings)
+
+## Installation
+
+### 1. Clone the Repository
 
 ```bash
-# Запустить все сервисы через Docker
-docker-compose up -d
-
-# Проверить статус
-docker-compose ps
+git clone https://github.com/your-org/memory-agents.git
+cd memory-agents
 ```
 
-### 2. Установка пакета
+### 2. Create Virtual Environment
 
 ```bash
-# Создать виртуальное окружение
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
 
-# Установить зависимости
+### 3. Install Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-### 3. Конфигурация
+## Quick Setup
+
+### 1. Start Dependencies
 
 ```bash
-# Скопировать пример конфигурации
-cp .env.example .env
-
-# Отредактировать .env при необходимости
-# По умолчанию настроен на локальные сервисы Docker
+docker-compose up -d
 ```
 
-### 4. Первый запуск
+This starts:
+- Redis (port 6379)
+- MongoDB (port 27017)
+- Qdrant (port 6333)
+- PostgreSQL (port 5432)
 
-```python
-# test_memory.py
-import asyncio
-from memory_agents import initialize_memory_system
+### 2. Configure Environment
 
-async def main():
-    # Инициализация системы
-    orchestrator = await initialize_memory_system(agent_id="my_agent")
-    
-    # Добавление сообщения в рабочую память
-    await orchestrator.working.add_message(
-        session_id="session_1",
-        role="user",
-        content="Hello, Memory-Agents!"
-    )
-    
-    # Получение контекста
-    context = await orchestrator.working.get_context("session_1")
-    print(f"Messages: {len(context)}")
-    print(f"Content: {context[0]['content']}")
-
-asyncio.run(main())
-```
-
-```bash
-# Запустить
-python test_memory.py
-```
-
-### 5. Запуск примера
-
-```bash
-# Полный пример использования
-python examples/basic_usage.py
-```
-
-## 📚 Основные операции
-
-### Рабочая память (Working Memory)
-
-```python
-# Добавить сообщение
-await orchestrator.working.add_message(
-    session_id="session_1",
-    role="user",
-    content="Привет!"
-)
-
-# Получить контекст
-messages = await orchestrator.working.get_context("session_1")
-
-# Временные переменные
-await orchestrator.working.set_temp_variable(
-    "session_1", "topic", "multi-agent-systems"
-)
-topic = await orchestrator.working.get_temp_variable("session_1", "topic")
-```
-
-### Комплексный поиск контекста
-
-```python
-context = await orchestrator.retrieve_context(
-    agent_id="my_agent",
-    session_id="session_1",
-    query="Что мы обсуждали о памяти?",
-    max_tokens=4096
-)
-
-print(f"Working: {len(context['working'])} items")
-print(f"Episodic: {len(context['episodic'])} items")
-print(f"Semantic: {len(context['semantic'])} items")
-```
-
-### Консолидация сессии
-
-```python
-# Перенос из рабочей памяти в долговременную
-await orchestrator.consolidate_session(
-    agent_id="my_agent",
-    session_id="session_1"
-)
-```
-
-### Добавление знаний
-
-```python
-from memory_agents import SemanticKnowledge, KnowledgeType
-
-knowledge = SemanticKnowledge(
-    content="Redis - это хранилище данных в памяти",
-    knowledge_type=KnowledgeType.FACT,
-    source="documentation",
-    tags=["redis", "database"]
-)
-
-# Требуется сервис эмбеддингов
-# embedding = await embedding_service.embed(knowledge.content)
-# await orchestrator.semantic.add_knowledge(knowledge, embedding)
-```
-
-### Добавление процедур
-
-```python
-from memory_agents import Procedure, ProcedureType, ProcedureParameter
-
-procedure = Procedure(
-    name="greeting",
-    procedure_type=ProcedureType.PROMPT_TEMPLATE,
-    description="Шаблон приветствия",
-    content="Привет, {name}!",
-    parameters=[
-        ProcedureParameter(name="name", type="string", required=True)
-    ]
-)
-
-proc_id = await orchestrator.procedural.save_procedure(procedure)
-```
-
-## 🔧 Команды Makefile
-
-```bash
-make install        # Установить зависимости
-make docker-up      # Запустить Docker сервисы
-make docker-down    # Остановить Docker сервисы
-make test           # Запустить тесты
-make run-example    # Запустить пример
-make lint           # Проверить код
-make format         # Форматировать код
-```
-
-## 📖 Дополнительные ресурсы
-
-- [Полная документация](./docs/GETTING_STARTED.md)
-- [Архитектура системы](./docs/ARCHITECTURE.md)
-- [Примеры использования](./examples/)
-
-## 🐛 Проблемы?
-
-### Проверка сервисов
+Create `.env` file:
 
 ```bash
 # Redis
-redis-cli ping  # Должен вернуть PONG
+REDIS_URL=redis://localhost:6379
 
 # MongoDB
-mongosh --eval "db.adminCommand('ping')"
+MONGODB_URL=mongodb://localhost:27017
+MONGODB_DATABASE=agent_memory
 
 # Qdrant
-curl http://localhost:6333/health
+QDRANT_URL=http://localhost:6333
 
 # PostgreSQL
-psql -U postgres -c "SELECT version();"
+POSTGRES_URL=postgresql://postgres:password@localhost:5432/memory_logs
+
+# Embeddings (Required)
+OPENAI_API_KEY=your_openai_api_key_here
+EMBEDDING_MODEL=text-embedding-3-small
+
+# Optional
+LOG_LEVEL=INFO
+PROMETHEUS_PORT=8000
 ```
 
-### Логи Docker
+### 3. Initialize Databases
 
 ```bash
-# Все логи
-docker-compose logs -f
+# MongoDB initialization
+mongo < scripts/mongo-init.js
 
-# Конкретный сервис
-docker-compose logs -f mongodb
+# PostgreSQL initialization
+psql -d memory_logs -f scripts/postgres-init.sql
 ```
 
-## 📊 Мониторинг
+## Basic Usage
+
+### Simple Example
+
+```python
+import asyncio
+from memory_agents import get_memory_facade
+
+async def main():
+    # Get memory facade
+    memory = get_memory_facade()
+    
+    # Create an episode
+    await memory.create_episode(
+        episode_id="ep_001",
+        context={
+            "agent_id": "support_agent_001",
+            "user_id": "user_123",
+            "session_id": "session_001"
+        },
+        scope="user_private",
+        episode_type="interaction",
+        title="Customer support interaction",
+        trajectory=[{
+            "step_id": "1",
+            "timestamp": "2024-01-01T10:00:00Z",
+            "role": "user",
+            "action": "message",
+            "content": "I need help with billing"
+        }],
+        success=True,
+        importance=0.8
+    )
+    
+    # Store knowledge
+    await memory.create_knowledge(
+        knowledge_id="kb_001",
+        knowledge="Premium users have priority support",
+        source="system",
+        confidence=1.0,
+        agent_id="support_agent_001"
+    )
+    
+    # Get comprehensive context
+    context = await memory.retrieve_comprehensive_context(
+        agent_id="support_agent_001",
+        user_id="user_123"
+    )
+    
+    print(f"Retrieved context with {len(context.get('episodes', []))} episodes")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Run the Example
 
 ```bash
-# Запустить с мониторингом
-docker-compose --profile monitoring up -d
-
-# Prometheus: http://localhost:9090
-# Grafana: http://localhost:3000 (admin/admin)
+python examples/memory_usage_example.py
 ```
 
-## 🎯 Что дальше?
+## Memory Types Overview
 
-1. Изучите [примеры](./examples/)
-2. Прочитайте [архитектуру](./docs/ARCHITECTURE.md)
-3. Настройте сервис эмбеддингов для полной функциональности
-4. Интегрируйте в свою мультиагентную систему
+### 1. Working Memory (Redis)
+Short-term operational memory for active sessions.
 
----
+```python
+# Store session data
+await memory.working.store_session("session_001", {
+    "current_message": "User needs help",
+    "conversation_history": [...],
+    "temporary_variables": {"user_tier": "premium"}
+})
 
-**Версия**: 0.1.0  
-**Лицензия**: MIT  
-**Документация**: [docs/](./docs/)
+# Get context
+context = await memory.working.get_context("agent_001", "session_001")
+```
 
+### 2. Episodic Memory (MongoDB + Qdrant)
+Long-term memory for specific events.
 
+```python
+# Create episode
+await memory.create_episode(
+    episode_id="ep_001",
+    context={"agent_id": "agent_001", "user_id": "user_123"},
+    scope="user_private",
+    episode_type="interaction",
+    title="User support call",
+    trajectory=[...],
+    success=True,
+    importance=0.8
+)
 
+# Query episodes
+episodes = await memory.query_episodes(
+    filter_by_agent_id="agent_001",
+    filter_by_user_id="user_123",
+    min_importance=0.5,
+    limit=10
+)
+```
 
+### 3. Semantic Memory (MongoDB + Qdrant)
+Generalized knowledge with vector search.
 
+```python
+# Store knowledge
+await memory.create_knowledge(
+    knowledge_id="kb_001",
+    knowledge="Premium users have priority support",
+    source="system",
+    confidence=1.0,
+    agent_id="agent_001"
+)
+
+# Semantic search
+knowledge_items = await memory.semantic_search(
+    query_embedding=[0.1, 0.2, ...],  # Your embedding vector
+    agent_id="agent_001",
+    limit=10
+)
+```
+
+### 4. Procedural Memory (MongoDB)
+Skills and executable code.
+
+```python
+# Store procedure
+await memory.procedural.store_procedure(
+    procedure_id="proc_001",
+    name="resolve_billing_issue",
+    description="Resolve billing issues",
+    code="def resolve_billing_issue(account): ...",
+    language="python"
+)
+
+# Execute procedure
+result = await memory.procedural.execute_procedure(
+    name="resolve_billing_issue",
+    parameters={"account": "12345"}
+)
+```
+
+### 5. User Facts (MongoDB)
+Personal information with versioning.
+
+```python
+# Store fact
+await memory.facts.store_fact(
+    fact_id="fact_001",
+    user_id="user_123",
+    fact_type="personal",
+    key="name",
+    value="John Doe",
+    confidence=1.0,
+    source="user_stated"
+)
+
+# Get user profile
+profile = await memory.facts.get_user_profile("user_123")
+```
+
+## Multi-Agent Coordination
+
+```python
+# Coordinate agents through pub/sub
+await memory.working.coordinate_agents(
+    task_id="task_001",
+    message={"action": "analyze", "data": "..."},
+    target_agents=["agent_001", "agent_002"]
+)
+
+# Get task results
+results = await memory.working.get_task_results("task_001", timeout=30)
+```
+
+## Health Monitoring
+
+```python
+# Health check
+health = await memory.health_check()
+print(f"System status: {health['status']}")
+
+# Get metrics
+metrics = await memory.get_metrics()
+print(f"Active sessions: {metrics['working_memory']['active_sessions']}")
+```
+
+## Testing
+
+### Run Tests
+
+```bash
+pytest
+```
+
+### Linting
+
+```bash
+ruff check .
+```
+
+### Type Checking
+
+```bash
+mypy .
+```
+
+## Next Steps
+
+1. **Read the Documentation**: Check out [API Reference](API_REFERENCE.md) for detailed API documentation
+2. **Explore Examples**: See [Examples](EXAMPLES.md) for comprehensive usage examples
+3. **Deploy to Production**: Follow the [Deployment Guide](DEPLOYMENT.md) for production setup
+4. **Understand Architecture**: Read [Architecture](ARCHITECTURE.md) for system design details
+
+## Troubleshooting
+
+### Common Issues
+
+#### Connection Errors
+- Ensure all services are running: `docker-compose ps`
+- Check connection URLs in `.env`
+- Verify ports are not in use
+
+#### OpenAI API Errors
+- Verify your API key is correct
+- Check API quota and billing
+- Ensure internet connectivity
+
+#### Database Errors
+- Check if databases are initialized
+- Verify user permissions
+- Check disk space
+
+### Getting Help
+
+- 📖 **Documentation**: [docs/](docs/)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/your-org/memory-agents/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/your-org/memory-agents/discussions)
+
+## Configuration Options
+
+### Environment Variables
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `REDIS_URL` | Redis connection URL | `redis://localhost:6379` | Yes |
+| `MONGODB_URL` | MongoDB connection URL | `mongodb://localhost:27017` | Yes |
+| `QDRANT_URL` | Qdrant server URL | `http://localhost:6333` | Yes |
+| `POSTGRES_URL` | PostgreSQL connection URL | `postgresql://postgres:password@localhost:5432/memory_logs` | Yes |
+| `OPENAI_API_KEY` | OpenAI API key | None | Yes |
+| `EMBEDDING_MODEL` | Embedding model name | `text-embedding-3-small` | No |
+| `LOG_LEVEL` | Logging level | `INFO` | No |
+
+### Memory Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REDIS_SESSION_TTL` | Session TTL in seconds | `3600` |
+| `MONGODB_DATABASE` | MongoDB database name | `agent_memory` |
+| `WORKING_MEMORY_MAX_MESSAGES` | Max messages in working memory | `50` |
+| `EPISODIC_MEMORY_TTL_DAYS` | Episodic memory TTL | `90` |
+| `SEMANTIC_MEMORY_TTL_DAYS` | Semantic memory TTL | `365` |
+
+## Production Considerations
+
+### Security
+- Use strong passwords for databases
+- Enable TLS/SSL for all connections
+- Implement proper access controls
+- Regular security updates
+
+### Performance
+- Monitor resource usage
+- Optimize database indexes
+- Use connection pooling
+- Implement caching strategies
+
+### Monitoring
+- Set up health checks
+- Monitor metrics and logs
+- Implement alerting
+- Regular backups
+
+### Scaling
+- Use load balancers
+- Implement horizontal scaling
+- Optimize database queries
+- Use CDN for static assets
