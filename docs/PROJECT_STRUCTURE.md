@@ -216,3 +216,6 @@ MIT License - см. LICENSE файл
 0.1.0 - Initial Release
 
 
+
+
+

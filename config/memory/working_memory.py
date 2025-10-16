@@ -30,3 +30,6 @@ class WorkingMemoryConfig:
             self.compression_threshold = settings.working_memory_compression_threshold
 
 
+
+
+

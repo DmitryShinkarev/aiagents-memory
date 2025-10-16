@@ -424,7 +424,7 @@ class MemoryOrchestrator:
             selected[item["type"]].append(item["content"])
             total_tokens += item["tokens"]
         
-        selected["total_tokens"] = total_tokens
+        selected["total_tokens"] = [total_tokens]
         
         return selected
     
@@ -488,5 +488,8 @@ class MemoryOrchestrator:
         # Very basic - would use proper NLP
         words = query.lower().split()
         return [w for w in words if len(w) > 4][:5]
+
+
+
 
 

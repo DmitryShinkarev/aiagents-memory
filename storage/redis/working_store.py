@@ -308,3 +308,6 @@ class RedisWorkingMemory:
         return await self.get_temp_variable(session_id, "_needs_compression") or False
 
 
+
+
+

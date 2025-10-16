@@ -38,3 +38,6 @@ CREATE INDEX IF NOT EXISTS idx_events_details ON events USING GIN (details);
 -- GRANT ALL PRIVILEGES ON TABLE events TO memory_agent_user;
 
 
+
+
+
