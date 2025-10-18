@@ -481,25 +481,39 @@ class EpisodicMemoryService:
                     "consolidation_details": {}
                 }
             
-            # TODO: Implement clustering and knowledge extraction
-            # For now, just mark episodes as consolidated
+            # Consolidate episodes into knowledge
+            from ..memory.semantic import SemanticMemoryService
+            semantic_service = SemanticMemoryService()
+            
+            # Get episode IDs for consolidation
+            episode_ids = [episode["episode_id"] for episode in episodes]
+            
+            # Perform knowledge consolidation
+            created_knowledge_ids = await semantic_service.consolidate_knowledge_from_episodes(
+                episode_ids=episode_ids,
+                min_confidence=0.7
+            )
+            
+            # Mark episodes as consolidated and link to created knowledge
             consolidated_count = 0
             for episode in episodes:
                 if not episode.get("consolidated", False):
                     await self.update_episode(episode["episode_id"], {
                         "consolidated": True,
-                        "consolidated_at": datetime.utcnow()
+                        "consolidated_at": datetime.utcnow(),
+                        "consolidated_knowledge_ids": created_knowledge_ids
                     })
                     consolidated_count += 1
             
-            logger.info(f"Consolidated {consolidated_count} episodes")
+            logger.info(f"Consolidated {consolidated_count} episodes into {len(created_knowledge_ids)} knowledge items")
             
             return {
                 "episodes_processed": len(episodes),
-                "clusters_found": 0,  # TODO: Implement clustering
-                "knowledge_items_created": 0,  # TODO: Implement knowledge extraction
+                "clusters_found": len(created_knowledge_ids),  # Number of knowledge clusters created
+                "knowledge_items_created": len(created_knowledge_ids),
                 "consolidation_details": {
-                    "consolidated_count": consolidated_count
+                    "consolidated_count": consolidated_count,
+                    "created_knowledge_ids": created_knowledge_ids
                 }
             }
             

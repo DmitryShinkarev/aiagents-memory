@@ -735,3 +735,5 @@ cp /var/lib/redis/dump.rdb /backup/redis/
 2. **Backup Encryption**: Encrypt backup files
 3. **Access Control**: Implement proper access controls
 4. **Audit Logging**: Enable audit logging for all operations
+
+

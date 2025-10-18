@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
 
-from ..clients.redis_client import get_redis_client
+from ...storage.clients.redis_client import get_redis_client
 from ...config.settings import get_settings
 
 logger = logging.getLogger(__name__)

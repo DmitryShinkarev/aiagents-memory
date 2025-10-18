@@ -489,16 +489,323 @@ class SemanticMemoryService:
             List of created knowledge IDs
         """
         try:
-            # TODO: Implement LLM-based knowledge extraction
-            # For now, return empty list
+            if not episode_ids:
+                logger.warning("No episodes provided for consolidation")
+                return []
+            
             logger.info(f"Consolidating knowledge from {len(episode_ids)} episodes")
-            return []
+            
+            # Import episodic service to get episode data
+            from ..memory.episodic import EpisodicMemoryService
+            episodic_service = EpisodicMemoryService()
+            
+            # Get episode data
+            episodes = []
+            for episode_id in episode_ids:
+                episode = await episodic_service.get_episode(episode_id, include_trajectory=True)
+                if episode:
+                    episodes.append(episode)
+            
+            if not episodes:
+                logger.warning("No valid episodes found for consolidation")
+                return []
+            
+            # Cluster similar episodes
+            clusters = await self._cluster_episodes_by_similarity(episodes)
+            
+            created_knowledge_ids = []
+            
+            # Extract knowledge from each cluster
+            for cluster in clusters:
+                if len(cluster) >= 2:  # Minimum cluster size
+                    knowledge_items = await self._extract_knowledge_from_cluster(
+                        cluster, min_confidence
+                    )
+                    
+                    for knowledge_data in knowledge_items:
+                        knowledge_id = f"kb_consolidated_{int(datetime.utcnow().timestamp())}"
+                        
+                        created_id = await self.create_knowledge(
+                            knowledge_id=knowledge_id,
+                            knowledge=knowledge_data["knowledge"],
+                            source=SourceType.CONSOLIDATED,
+                            confidence=knowledge_data["confidence"],
+                            agent_id=cluster[0]["context"]["agent_id"],
+                            tags=knowledge_data["tags"],
+                            supporting_evidence=[ep["episode_id"] for ep in cluster],
+                            temporal_scope="always",
+                            half_life_days=365
+                        )
+                        
+                        created_knowledge_ids.append(created_id)
+                        
+                        logger.info(f"Created consolidated knowledge: {knowledge_id}")
+            
+            logger.info(f"Successfully consolidated {len(created_knowledge_ids)} knowledge items")
+            return created_knowledge_ids
             
         except Exception as e:
             logger.error(f"Failed to consolidate knowledge from episodes: {e}")
             return []
     
-    # Helper methods
+    # Helper methods for consolidation
+    
+    async def _cluster_episodes_by_similarity(self, episodes: List[Dict[str, Any]]) -> List[List[Dict[str, Any]]]:
+        """
+        Cluster episodes by semantic similarity.
+        
+        Args:
+            episodes: List of episode dictionaries
+            
+        Returns:
+            List of episode clusters
+        """
+        try:
+            if len(episodes) < 2:
+                return [episodes] if episodes else []
+            
+            # Simple clustering based on episode type, tags, and outcome similarity
+            clusters = []
+            used_episodes = set()
+            
+            for i, episode in enumerate(episodes):
+                if episode["episode_id"] in used_episodes:
+                    continue
+                
+                current_cluster = [episode]
+                used_episodes.add(episode["episode_id"])
+                
+                # Find similar episodes
+                for j, other_episode in enumerate(episodes[i+1:], i+1):
+                    if other_episode["episode_id"] in used_episodes:
+                        continue
+                    
+                    if self._episodes_are_similar(episode, other_episode):
+                        current_cluster.append(other_episode)
+                        used_episodes.add(other_episode["episode_id"])
+                
+                clusters.append(current_cluster)
+            
+            logger.debug(f"Created {len(clusters)} episode clusters")
+            return clusters
+            
+        except Exception as e:
+            logger.error(f"Failed to cluster episodes: {e}")
+            return [episodes] if episodes else []
+    
+    def _episodes_are_similar(self, episode1: Dict[str, Any], episode2: Dict[str, Any]) -> bool:
+        """
+        Check if two episodes are similar enough to be clustered.
+        
+        Args:
+            episode1: First episode
+            episode2: Second episode
+            
+        Returns:
+            True if episodes are similar
+        """
+        try:
+            # Check episode type
+            if episode1.get("episode_type") != episode2.get("episode_type"):
+                return False
+            
+            # Check if they have common tags
+            tags1 = set(episode1.get("tags", []))
+            tags2 = set(episode2.get("tags", []))
+            common_tags = tags1.intersection(tags2)
+            
+            if len(common_tags) == 0:
+                return False
+            
+            # Check outcome similarity (simple text similarity)
+            outcome1 = episode1.get("outcome", "").lower()
+            outcome2 = episode2.get("outcome", "").lower()
+            
+            if not outcome1 or not outcome2:
+                return False
+            
+            # Simple similarity check - if they share significant words
+            words1 = set(outcome1.split())
+            words2 = set(outcome2.split())
+            
+            # Remove common words
+            common_words = {"the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by"}
+            words1 = words1 - common_words
+            words2 = words2 - common_words
+            
+            if len(words1) == 0 or len(words2) == 0:
+                return False
+            
+            similarity = len(words1.intersection(words2)) / max(len(words1), len(words2))
+            
+            return similarity > 0.3  # 30% word overlap threshold
+            
+        except Exception as e:
+            logger.warning(f"Error checking episode similarity: {e}")
+            return False
+    
+    async def _extract_knowledge_from_cluster(
+        self, 
+        cluster: List[Dict[str, Any]], 
+        min_confidence: float
+    ) -> List[Dict[str, Any]]:
+        """
+        Extract knowledge from a cluster of similar episodes.
+        
+        Args:
+            cluster: List of similar episodes
+            min_confidence: Minimum confidence threshold
+            
+        Returns:
+            List of extracted knowledge items
+        """
+        try:
+            if len(cluster) < 2:
+                return []
+            
+            knowledge_items = []
+            
+            # Extract common patterns
+            episode_type = cluster[0].get("episode_type", "unknown")
+            common_tags = set(cluster[0].get("tags", []))
+            
+            # Find intersection of all tags
+            for episode in cluster[1:]:
+                common_tags = common_tags.intersection(set(episode.get("tags", [])))
+            
+            # Analyze outcomes for patterns
+            outcomes = [ep.get("outcome", "") for ep in cluster if ep.get("outcome")]
+            
+            if outcomes:
+                # Extract common outcome patterns
+                outcome_knowledge = self._extract_outcome_patterns(outcomes, episode_type)
+                if outcome_knowledge:
+                    knowledge_items.append({
+                        "knowledge": outcome_knowledge,
+                        "confidence": min(0.9, 0.5 + (len(cluster) * 0.1)),
+                        "tags": list(common_tags) + [episode_type, "outcome_pattern"]
+                    })
+            
+            # Extract success patterns
+            successful_episodes = [ep for ep in cluster if ep.get("success", False)]
+            if len(successful_episodes) >= 2:
+                success_knowledge = self._extract_success_patterns(successful_episodes)
+                if success_knowledge:
+                    knowledge_items.append({
+                        "knowledge": success_knowledge,
+                        "confidence": min(0.95, 0.6 + (len(successful_episodes) * 0.1)),
+                        "tags": list(common_tags) + [episode_type, "success_pattern"]
+                    })
+            
+            # Extract user satisfaction patterns
+            satisfied_episodes = [ep for ep in cluster if ep.get("user_satisfaction", 0) > 0.7]
+            if len(satisfied_episodes) >= 2:
+                satisfaction_knowledge = self._extract_satisfaction_patterns(satisfied_episodes)
+                if satisfaction_knowledge:
+                    knowledge_items.append({
+                        "knowledge": satisfaction_knowledge,
+                        "confidence": min(0.9, 0.7 + (len(satisfied_episodes) * 0.05)),
+                        "tags": list(common_tags) + [episode_type, "satisfaction_pattern"]
+                    })
+            
+            # Filter by minimum confidence
+            filtered_items = [
+                item for item in knowledge_items 
+                if item["confidence"] >= min_confidence
+            ]
+            
+            logger.debug(f"Extracted {len(filtered_items)} knowledge items from cluster of {len(cluster)} episodes")
+            return filtered_items
+            
+        except Exception as e:
+            logger.error(f"Failed to extract knowledge from cluster: {e}")
+            return []
+    
+    def _extract_outcome_patterns(self, outcomes: List[str], episode_type: str) -> Optional[str]:
+        """Extract common patterns from episode outcomes."""
+        try:
+            if not outcomes:
+                return None
+            
+            # Simple pattern extraction based on common words
+            all_words = []
+            for outcome in outcomes:
+                words = outcome.lower().split()
+                all_words.extend(words)
+            
+            # Count word frequency
+            word_counts = {}
+            for word in all_words:
+                word_counts[word] = word_counts.get(word, 0) + 1
+            
+            # Find common words (appearing in at least 50% of outcomes)
+            min_occurrences = max(1, len(outcomes) * 0.5)
+            common_words = [word for word, count in word_counts.items() if count >= min_occurrences]
+            
+            if not common_words:
+                return None
+            
+            # Create knowledge statement
+            if episode_type == "interaction":
+                return f"In {episode_type} episodes, common outcomes include: {', '.join(common_words[:5])}"
+            else:
+                return f"In {episode_type} scenarios, typical results involve: {', '.join(common_words[:5])}"
+                
+        except Exception as e:
+            logger.warning(f"Error extracting outcome patterns: {e}")
+            return None
+    
+    def _extract_success_patterns(self, successful_episodes: List[Dict[str, Any]]) -> Optional[str]:
+        """Extract patterns from successful episodes."""
+        try:
+            if not successful_episodes:
+                return None
+            
+            # Analyze common characteristics of successful episodes
+            common_tags = set(successful_episodes[0].get("tags", []))
+            for episode in successful_episodes[1:]:
+                common_tags = common_tags.intersection(set(episode.get("tags", [])))
+            
+            # Analyze importance levels
+            importance_scores = [ep.get("importance", 0) for ep in successful_episodes]
+            avg_importance = sum(importance_scores) / len(importance_scores)
+            
+            # Create success knowledge
+            success_factors = []
+            if common_tags:
+                success_factors.append(f"tags: {', '.join(list(common_tags)[:3])}")
+            
+            if avg_importance > 0.7:
+                success_factors.append("high importance")
+            
+            if success_factors:
+                return f"Successful episodes typically have: {', '.join(success_factors)}"
+            
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Error extracting success patterns: {e}")
+            return None
+    
+    def _extract_satisfaction_patterns(self, satisfied_episodes: List[Dict[str, Any]]) -> Optional[str]:
+        """Extract patterns from high-satisfaction episodes."""
+        try:
+            if not satisfied_episodes:
+                return None
+            
+            # Analyze satisfaction scores
+            satisfaction_scores = [ep.get("user_satisfaction", 0) for ep in satisfied_episodes]
+            avg_satisfaction = sum(satisfaction_scores) / len(satisfaction_scores)
+            
+            # Analyze episode types
+            episode_types = [ep.get("episode_type", "unknown") for ep in satisfied_episodes]
+            most_common_type = max(set(episode_types), key=episode_types.count)
+            
+            return f"High user satisfaction ({avg_satisfaction:.2f}) is commonly achieved in {most_common_type} episodes"
+            
+        except Exception as e:
+            logger.warning(f"Error extracting satisfaction patterns: {e}")
+            return None
     
     def _calculate_expiration_date(
         self,
