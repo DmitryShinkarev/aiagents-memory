@@ -226,6 +226,20 @@ async def test_full_graph():
    - Use separate secure storage
    - Implement access controls
 
+## Git Configuration
+
+1. **.gitignore Requirements**
+   - **ALWAYS** add `.cursor` and `.claude` directories to `.gitignore`
+   - These directories contain local IDE and AI assistant configuration
+   - Should never be committed to version control
+   - Example `.gitignore` entries:
+     ```gitignore
+     # IDE and AI Assistant Configuration
+     .cursor
+     *.cursor
+     .claude
+     ```
+
 <!-- ## Documentation
 
 1. **Graph Documentation**

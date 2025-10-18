@@ -70,6 +70,10 @@ temp/
 docs/_build/
 site/
 
+.cursor
+*.cursor
+.claude
+
 
 
 

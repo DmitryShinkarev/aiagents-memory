@@ -423,8 +423,8 @@ class SemanticMemoryService:
     async def hybrid_search(
         self,
         dense_vector: List[float],
-        sparse_vector: Optional[Dict[str, float]] = None,
         agent_id: str,
+        sparse_vector: Optional[Dict[str, float]] = None,
         alpha: float = 0.7,
         limit: int = 10
     ) -> List[Dict[str, Any]]:
