@@ -33,11 +33,11 @@ __version__ = "0.2.0"
 __author__ = "Memory-Agents Team"
 
 # Core services
-from .services.memory_facade import MemoryFacade, get_memory_facade
-from .config.settings import Settings, get_settings
+from services.memory_facade import MemoryFacade, get_memory_facade
+from config.settings import Settings, get_settings
 
 # API contracts
-from .api.contracts.common import (
+from api.contracts.common import (
     APIVersion,
     OperationStatus,
     MemoryScope,
@@ -50,7 +50,7 @@ from .api.contracts.common import (
     SortOrder
 )
 
-from .api.contracts.entity import (
+from api.contracts.entity import (
     UniversalEntityWriteRequest,
     UniversalEntityUpdateRequest,
     UniversalEntityReadRequest,
@@ -58,7 +58,7 @@ from .api.contracts.entity import (
     UniversalEntityResponse
 )
 
-from .api.contracts.episode import (
+from api.contracts.episode import (
     UniversalEpisodeWriteRequest,
     UniversalEpisodeQueryRequest,
     UniversalEpisodeResponse,
@@ -66,34 +66,34 @@ from .api.contracts.episode import (
     EpisodeTrajectory
 )
 
-from .api.contracts.knowledge import (
+from api.contracts.knowledge import (
     UniversalKnowledgeWriteRequest,
     UniversalKnowledgeQueryRequest,
     UniversalKnowledgeResponse
 )
 
-from .api.contracts.facts import (
+from api.contracts.facts import (
     UniversalFactWriteRequest,
     UniversalFactQueryRequest,
     UniversalFactResponse
 )
 
 # Business logic
-from .business.idempotency import IdempotencyGuard, idempotent_operation
-from .business.validation import RequestValidator, ValidationError
+from business.idempotency import IdempotencyGuard, idempotent_operation
+from business.validation import RequestValidator, ValidationError
 
 # Domain services
-from .domain.memory.working import WorkingMemoryService
-from .domain.memory.episodic import EpisodicMemoryService
-from .domain.memory.semantic import SemanticMemoryService
-from .domain.memory.procedural import ProceduralMemoryService
-from .domain.memory.facts import FactsService
+from domain.memory.working import WorkingMemoryService
+from domain.memory.episodic import EpisodicMemoryService
+from domain.memory.semantic import SemanticMemoryService
+from domain.memory.procedural import ProceduralMemoryService
+from domain.memory.facts import FactsService
 
 # Storage clients
-from .storage.clients.redis_client import RedisClient, get_redis_client
-from .storage.clients.mongo_client import MongoClient, get_mongo_client
-from .storage.clients.qdrant_client import QdrantClient, get_qdrant_client
-from .storage.clients.postgres_client import PostgresClient, get_postgres_client
+from storage.clients.redis_client import RedisClient, get_redis_client
+from storage.clients.mongo_client import MongoClient, get_mongo_client
+from storage.clients.qdrant_client import QdrantClient, get_qdrant_client
+from storage.clients.postgres_client import PostgresClient, get_postgres_client
 
 __all__ = [
     # Core services

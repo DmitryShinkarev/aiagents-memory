@@ -11,7 +11,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, validator
 
-from .common import (
+from api.contracts.common import (
     BaseRequest,
     BaseResponse,
     PaginationRequest,

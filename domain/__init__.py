@@ -5,16 +5,20 @@ This module contains the core domain logic for memory operations,
 including working memory, episodic memory, semantic memory, and procedural memory.
 """
 
-from .memory.working import WorkingMemoryService
-from .memory.episodic import EpisodicMemoryService
-from .memory.semantic import SemanticMemoryService
-from .memory.procedural import ProceduralMemoryService
-from .memory.facts import FactsService
+from domain.memory.working import WorkingMemoryService
+from domain.memory.episodic import EpisodicMemoryService
+from domain.memory.semantic import SemanticMemoryService
+from domain.memory.procedural import ProceduralMemoryService
+from domain.memory.facts import FactsService
+
+# Alias for consistency with naming pattern
+FactsMemoryService = FactsService
 
 __all__ = [
     "WorkingMemoryService",
-    "EpisodicMemoryService", 
+    "EpisodicMemoryService",
     "SemanticMemoryService",
     "ProceduralMemoryService",
     "FactsService",
+    "FactsMemoryService",
 ]

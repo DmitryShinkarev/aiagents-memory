@@ -19,7 +19,7 @@ from pymongo.errors import (
 )
 from pymongo import ASCENDING, DESCENDING, IndexModel, TEXT
 
-from ...config.settings import get_settings
+from config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ class MongoClient:
     
     async def disconnect(self) -> None:
         """Close MongoDB connection."""
-        if self._client:
+        if self._client is not None:
             self._client.close()
         logger.info("MongoDB client disconnected")
     
@@ -141,7 +141,7 @@ class MongoClient:
     async def health_check(self) -> Dict[str, Any]:
         """Perform health check on MongoDB connection."""
         try:
-            if not self._client:
+            if self._client is None:
                 return {
                     "status": "unhealthy",
                     "error": "Client not connected",
@@ -189,7 +189,7 @@ class MongoClient:
     @property
     def database(self) -> AsyncIOMotorDatabase:
         """Get database instance."""
-        if not self._database:
+        if self._database is None:
             raise RuntimeError("MongoDB client not connected")
         return self._database
     
@@ -383,13 +383,13 @@ class MongoClient:
     
     async def start_session(self):
         """Start a MongoDB session for transactions."""
-        if not self._client:
+        if self._client is None:
             raise RuntimeError("MongoDB client not connected")
         return await self._client.start_session()
-    
+
     async def with_transaction(self, callback, session=None):
         """Execute callback within a transaction."""
-        if not self._client:
+        if self._client is None:
             raise RuntimeError("MongoDB client not connected")
         
         if session is None:

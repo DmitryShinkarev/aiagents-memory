@@ -1,0 +1,47 @@
+%%{init: {'theme': 'base', 'flowchart': {'curve': 'straight'}}}%%
+flowchart TD
+    P[Memory Agents Project Root]
+
+    %% Core packages
+    P --> API[api]
+    API --> APIContracts[contracts/]
+    API --> APIVersioning[versioning.py]
+
+    P --> Business[business]
+    Business --> BizIdempotency[idempotency.py]
+    Business --> BizValidation[validation.py]
+
+    P --> Domain[domain]
+    Domain --> DomainMemory[memory/]
+    DomainMemory --> Episodic[episodic.py]
+    DomainMemory --> Semantic[semantic.py]
+    DomainMemory --> Procedural[procedural.py]
+    DomainMemory --> Facts[facts.py]
+    DomainMemory --> Working[working.py]
+
+    P --> Services[services]
+    Services --> MemoryFacade[memory_facade.py]
+
+    P --> Storage[storage]
+    Storage --> StorageClients[clients/]
+    StorageClients --> Mongo[mongo_client.py]
+    StorageClients --> Postgres[postgres_client.py]
+    StorageClients --> Qdrant[qdrant_client.py]
+    StorageClients --> Redis[redis_client.py]
+
+    %% Supporting assets
+    P --> Examples[examples]
+    Examples --> PyExample[memory_usage_example.py]
+    Examples --> Notebooks[notebooks/]
+
+    P --> Docs[docs]
+    Docs --> Arch[ARCHITECTURE.md]
+    Docs --> APIRef[API_REFERENCE.md]
+    Docs --> Guides[GETTING_STARTED.md, QUICKSTART.md, etc.]
+
+    P --> Config[config/]
+    P --> Scripts[scripts/]
+    P --> Docker[docker-compose.yml]
+    P --> Requirements[requirements.txt]
+    P --> Setup[setup.py]
+

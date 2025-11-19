@@ -28,6 +28,30 @@
 
 ## Code Style
 
+### Import Rules
+
+**CRITICAL: Always use absolute imports without relative paths**
+
+✅ **Correct:**
+```python
+from domain.memory.working import WorkingMemoryService
+from api.contracts.episode import EpisodeType
+from storage.clients.redis_client import get_redis_client
+```
+
+❌ **Incorrect:**
+```python
+from ...storage.clients.redis_client import get_redis_client  # NO!
+from ..api.contracts.episode import EpisodeType  # NO!
+from .working import WorkingMemoryService  # NO!
+```
+
+**Rules:**
+1. Never use relative imports with dots (`.`, `..`, `...`)
+2. Always import from the project root using absolute paths
+3. In Jupyter notebooks, add project root to `sys.path` first
+4. This ensures compatibility across different execution contexts
+
 ### State Definition
 ```python
 from pydantic import BaseModel, Field

@@ -13,10 +13,10 @@ from typing import Any, Dict, List, Optional, Union
 from bson import ObjectId
 from pymongo import ASCENDING, DESCENDING
 
-from ...storage.clients.mongo_client import get_mongo_client
-from ...storage.clients.qdrant_client import get_qdrant_client
-from ...config.settings import get_settings
-from ...api.contracts.episode import (
+from storage.clients.mongo_client import get_mongo_client
+from storage.clients.qdrant_client import get_qdrant_client
+from config.settings import get_settings
+from api.contracts.episode import (
     EpisodeContext,
     EpisodeTrajectory,
     EpisodeScope,
@@ -48,8 +48,95 @@ class EpisodicMemoryService:
         return self._qdrant_client
     
     # Episode creation and management
-    
+
     async def create_episode(
+        self,
+        episode_id: str,
+        episode_type: EpisodeType,
+        agent_id: str,
+        session_id: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+        outcome: Optional[str] = None,
+        success: bool = True,
+        importance: float = 0.5,
+        user_satisfaction: Optional[float] = None,
+        tags: Optional[List[str]] = None,
+        user_id: Optional[str] = None,
+        team_id: Optional[str] = None,
+        title: Optional[str] = None,
+        status: EpisodeStatus = EpisodeStatus.COMPLETED,
+        metadata: Optional[Dict[str, Any]] = None,
+        retention_days: Optional[int] = None
+    ) -> str:
+        """
+        Create a new episode with simplified parameters.
+
+        Args:
+            episode_id: Unique episode identifier
+            episode_type: Type of episode
+            agent_id: Primary agent identifier
+            session_id: Optional session identifier
+            context: Optional context data dictionary
+            outcome: Episode outcome description
+            success: Whether episode was successful
+            importance: Episode importance (0.0-1.0)
+            user_satisfaction: User satisfaction rating (0.0-1.0)
+            tags: Episode tags
+            user_id: Optional user identifier
+            team_id: Optional team identifier
+            title: Optional episode title
+            status: Episode status
+            metadata: Additional metadata
+            retention_days: Retention period in days
+
+        Returns:
+            Created episode ID
+        """
+        # Create EpisodeContext object
+        episode_context = EpisodeContext(
+            user_id=user_id,
+            agent_id=agent_id,
+            team_id=team_id,
+            session_id=session_id,
+            parent_episode_id=None,
+            participating_agents=[agent_id]
+        )
+
+        # Determine scope based on context
+        if team_id:
+            scope = EpisodeScope.TEAM_SHARED
+        elif user_id:
+            scope = EpisodeScope.USER_PRIVATE
+        else:
+            scope = EpisodeScope.AGENT_PRIVATE
+
+        # Generate title if not provided
+        if not title:
+            title = f"{episode_type.value} - {episode_id}"
+
+        # Create empty trajectory (will be added later)
+        trajectory = []
+
+        # Call the full implementation
+        return await self._create_episode_full(
+            episode_id=episode_id,
+            context=episode_context,
+            scope=scope,
+            episode_type=episode_type,
+            title=title,
+            trajectory=trajectory,
+            outcome=outcome,
+            status=status,
+            success=success,
+            importance=importance,
+            user_satisfaction=user_satisfaction,
+            tags=tags,
+            metadata=metadata or context or {},
+            embedding=None,
+            retention_days=retention_days
+        )
+
+    async def _create_episode_full(
         self,
         episode_id: str,
         context: EpisodeContext,
@@ -186,8 +273,21 @@ class EpisodicMemoryService:
             if episode:
                 # Convert ObjectId to string
                 episode["_id"] = str(episode["_id"])
+
+                # Ensure trajectory has backward-compatible format
+                if include_trajectory and "trajectory" in episode:
+                    normalized_trajectory = []
+                    for idx, step in enumerate(episode["trajectory"]):
+                        # Add missing fields for backward compatibility
+                        if "step" not in step:
+                            step["step"] = idx + 1
+                        if "description" not in step and "content" in step:
+                            step["description"] = step["content"]
+                        normalized_trajectory.append(step)
+                    episode["trajectory"] = normalized_trajectory
+
                 logger.debug(f"Retrieved episode {episode_id}")
-            
+
             return episode
             
         except Exception as e:
@@ -264,7 +364,59 @@ class EpisodicMemoryService:
         except Exception as e:
             logger.error(f"Failed to delete episode {episode_id}: {e}")
             return False
-    
+
+    async def append_to_trajectory(
+        self,
+        episode_id: str,
+        step_data: Dict[str, Any]
+    ) -> bool:
+        """
+        Append a step to episode trajectory.
+
+        Args:
+            episode_id: Episode identifier
+            step_data: Step data to append (must contain at least: step, action, description)
+
+        Returns:
+            True if successful
+        """
+        try:
+            mongo_client = await self._get_mongo_client()
+
+            # Ensure step has required fields
+            if "timestamp" not in step_data:
+                step_data["timestamp"] = datetime.utcnow().isoformat()
+
+            # Create trajectory step
+            trajectory_step = {
+                "step_id": f"{episode_id}_step_{step_data.get('step', 0)}",
+                "timestamp": step_data.get("timestamp"),
+                "role": step_data.get("role", "system"),
+                "action": step_data.get("action", "unknown"),
+                "content": step_data.get("description", ""),
+                "description": step_data.get("description", ""),  # For backward compatibility
+                "step": step_data.get("step", 0),  # Add step number for notebook
+                "metadata": step_data.get("metadata", {})
+            }
+
+            # Append to trajectory array
+            result = await mongo_client.update_one(
+                "episodes",
+                {"episode_id": episode_id},
+                {"$push": {"trajectory": trajectory_step}}
+            )
+
+            success = result["modified_count"] > 0
+
+            if success:
+                logger.debug(f"Appended step to episode {episode_id} trajectory")
+
+            return success
+
+        except Exception as e:
+            logger.error(f"Failed to append to trajectory for episode {episode_id}: {e}")
+            return False
+
     # Episode querying
     
     async def query_episodes(
@@ -275,8 +427,11 @@ class EpisodicMemoryService:
         filter_by_session_id: Optional[str] = None,
         filter_by_scope: Optional[List[EpisodeScope]] = None,
         filter_by_type: Optional[List[EpisodeType]] = None,
+        filter_by_episode_type: Optional[List[EpisodeType]] = None,  # Alias for filter_by_type
         filter_by_status: Optional[List[EpisodeStatus]] = None,
         filter_by_tags: Optional[List[str]] = None,
+        filter_by_success: Optional[bool] = None,  # Alias for only_successful
+        filter_by_consolidated: Optional[bool] = None,
         time_range_start: Optional[datetime] = None,
         time_range_end: Optional[datetime] = None,
         min_importance: Optional[float] = None,
@@ -285,7 +440,10 @@ class EpisodicMemoryService:
         sort_by: str = "created_at",
         sort_order: str = "desc",
         limit: int = 50,
-        offset: int = 0
+        offset: int = 0,
+        # Backward compatibility aliases
+        agent_id: Optional[str] = None,
+        user_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Query episodes with various filters.
@@ -313,12 +471,22 @@ class EpisodicMemoryService:
             List of episodes
         """
         try:
+            # Handle backward compatibility aliases
+            if agent_id and not filter_by_agent_id:
+                filter_by_agent_id = agent_id
+            if user_id and not filter_by_user_id:
+                filter_by_user_id = user_id
+            if filter_by_episode_type and not filter_by_type:
+                filter_by_type = filter_by_episode_type
+            if filter_by_success is not None and only_successful is None:
+                only_successful = filter_by_success
+
             # Build MongoDB filter
             mongo_filter = {}
-            
+
             if filter_by_user_id:
                 mongo_filter["context.user_id"] = filter_by_user_id
-            
+
             if filter_by_agent_id:
                 mongo_filter["context.agent_id"] = filter_by_agent_id
             
@@ -354,7 +522,10 @@ class EpisodicMemoryService:
             
             if only_successful is not None:
                 mongo_filter["success"] = only_successful
-            
+
+            if filter_by_consolidated is not None:
+                mongo_filter["consolidated"] = filter_by_consolidated
+
             # Handle semantic search
             if semantic_query:
                 # For now, we'll do a simple text search
@@ -382,10 +553,22 @@ class EpisodicMemoryService:
                 limit=limit
             )
             
-            # Convert ObjectIds to strings
+            # Convert ObjectIds to strings and normalize trajectory
             for episode in episodes:
                 episode["_id"] = str(episode["_id"])
-            
+
+                # Ensure trajectory has backward-compatible format
+                if "trajectory" in episode and episode["trajectory"]:
+                    normalized_trajectory = []
+                    for idx, step in enumerate(episode["trajectory"]):
+                        # Add missing fields for backward compatibility
+                        if "step" not in step:
+                            step["step"] = idx + 1
+                        if "description" not in step and "content" in step:
+                            step["description"] = step["content"]
+                        normalized_trajectory.append(step)
+                    episode["trajectory"] = normalized_trajectory
+
             logger.debug(f"Retrieved {len(episodes)} episodes")
             return episodes
             
@@ -525,7 +708,41 @@ class EpisodicMemoryService:
                 "knowledge_items_created": 0,
                 "error": str(e)
             }
-    
+
+    async def consolidate_old_episodes(
+        self,
+        agent_id: Optional[str] = None,
+        max_age_days: Optional[int] = None,
+        min_importance: float = 0.5,
+        limit: int = 100
+    ) -> Dict[str, Any]:
+        """
+        Consolidate old episodes (alias for consolidate_episodes with simplified parameters).
+
+        Args:
+            agent_id: Target agent identifier
+            max_age_days: Maximum age of episodes in days (0 or None = all episodes)
+            min_importance: Minimum importance threshold
+            limit: Maximum number of episodes to process
+
+        Returns:
+            Consolidation results
+        """
+        # Calculate time range
+        time_range_end = datetime.utcnow()
+        time_range_start = None
+
+        if max_age_days and max_age_days > 0:
+            time_range_start = time_range_end - timedelta(days=max_age_days)
+
+        # Call the main consolidation method
+        return await self.consolidate_episodes(
+            time_range_start=time_range_start,
+            time_range_end=time_range_end,
+            min_importance=min_importance,
+            target_agent_id=agent_id
+        )
+
     # Helper methods
     
     def _get_retention_days(self, scope: EpisodeScope) -> int:

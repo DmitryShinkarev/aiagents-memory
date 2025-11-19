@@ -46,6 +46,7 @@ memory-agents/
 │   └── settings.py               # Application settings
 ├── examples/                      # Usage Examples
 │   ├── __init__.py
+│   ├── notebooks/                 # Interactive notebooks
 │   └── memory_usage_example.py   # Basic usage example
 ├── docs/                          # Documentation
 │   ├── ARCHITECTURE.md           # System architecture
@@ -465,5 +466,7 @@ mypy .
 - Prometheus metrics
 - Custom business metrics
 - Performance indicators
+
+
 
 

@@ -15,9 +15,9 @@ from typing import Any, Callable, Dict, Optional, TypeVar, Union
 
 from pydantic import BaseModel
 
-from ..api.contracts.common import IdempotencyGuard as IdempotencyGuardModel
-from ..storage.clients.redis_client import get_redis_client
-from ..storage.clients.postgres_client import get_postgres_client
+from api.contracts.common import IdempotencyGuard as IdempotencyGuardModel
+from storage.clients.redis_client import get_redis_client
+from storage.clients.postgres_client import get_postgres_client
 
 logger = logging.getLogger(__name__)
 

@@ -13,10 +13,10 @@ from typing import Any, Dict, List, Optional, Union
 
 from bson import ObjectId
 
-from ...storage.clients.mongo_client import get_mongo_client
-from ...storage.clients.qdrant_client import get_qdrant_client
-from ...config.settings import get_settings
-from ...api.contracts.knowledge import SourceType
+from storage.clients.mongo_client import get_mongo_client
+from storage.clients.qdrant_client import get_qdrant_client
+from config.settings import get_settings
+from api.contracts.knowledge import SourceType
 
 logger = logging.getLogger(__name__)
 

@@ -5,7 +5,7 @@ This module provides stable, versioned API contracts that remain consistent
 regardless of internal implementation changes.
 """
 
-from .contracts.common import (
+from api.contracts.common import (
     APIVersion,
     OperationStatus,
     MemoryScope,
@@ -23,7 +23,7 @@ from .contracts.common import (
     PaginationResponse,
 )
 
-from .contracts.entity import (
+from api.contracts.entity import (
     UniversalEntityWriteRequest,
     UniversalEntityUpdateRequest,
     UniversalEntityReadRequest,
@@ -33,7 +33,7 @@ from .contracts.entity import (
     EntityVersion,
 )
 
-from .contracts.episode import (
+from api.contracts.episode import (
     UniversalEpisodeWriteRequest,
     UniversalEpisodeQueryRequest,
     UniversalEpisodeResponse,
@@ -41,21 +41,21 @@ from .contracts.episode import (
     EpisodeTrajectory,
 )
 
-from .contracts.knowledge import (
+from api.contracts.knowledge import (
     UniversalKnowledgeWriteRequest,
     UniversalKnowledgeQueryRequest,
     UniversalKnowledgeResponse,
     KnowledgeMetadata,
 )
 
-from .contracts.facts import (
+from api.contracts.facts import (
     UniversalFactWriteRequest,
     UniversalFactQueryRequest,
     UniversalFactResponse,
     FactVersion,
 )
 
-from .versioning import APIVersionManager
+from api.versioning import APIVersionManager
 
 __all__ = [
     # Common

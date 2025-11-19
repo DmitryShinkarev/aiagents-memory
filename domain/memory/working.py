@@ -11,8 +11,8 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
 
-from ...storage.clients.redis_client import get_redis_client
-from ...config.settings import get_settings
+from storage.clients.redis_client import get_redis_client
+from config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,49 @@ class WorkingMemoryService:
         return self._redis_client
     
     # Session management
-    
+
+    async def create_session(
+        self,
+        session_id: str,
+        agent_id: str,
+        initial_context: Optional[Dict[str, Any]] = None,
+        ttl_seconds: Optional[int] = None
+    ) -> str:
+        """
+        Create a new session with initial context.
+
+        Args:
+            session_id: Unique session identifier
+            agent_id: Agent identifier
+            initial_context: Initial context data
+            ttl_seconds: Time to live in seconds
+
+        Returns:
+            Session ID if successful
+        """
+        try:
+            session_data = {
+                "agent_id": agent_id,
+                "session_id": session_id,
+                "created_at": datetime.utcnow().isoformat(),
+                "conversation_history": [],
+                "context": initial_context or {},
+                "temporary_variables": {},
+                "agent_state": {}
+            }
+
+            success = await self.store_session(session_id, session_data, ttl_seconds)
+
+            if success:
+                logger.info(f"Created session {session_id} for agent {agent_id}")
+                return session_id
+            else:
+                raise Exception("Failed to store session")
+
+        except Exception as e:
+            logger.error(f"Failed to create session {session_id}: {e}")
+            raise
+
     async def store_session(
         self,
         session_id: str,
@@ -153,76 +195,150 @@ class WorkingMemoryService:
             logger.error(f"Failed to delete session {session_id}: {e}")
             return False
     
+    # Message management
+
+    async def append_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """
+        Append a message to the conversation history.
+
+        Args:
+            session_id: Session identifier
+            role: Message role (user, assistant, system)
+            content: Message content
+            metadata: Optional metadata
+
+        Returns:
+            True if successful
+        """
+        try:
+            session_data = await self.get_session(session_id)
+            if not session_data:
+                raise Exception(f"Session {session_id} not found")
+
+            message = {
+                "role": role,
+                "content": content,
+                "timestamp": datetime.utcnow().isoformat(),
+                "metadata": metadata or {}
+            }
+
+            if "conversation_history" not in session_data:
+                session_data["conversation_history"] = []
+
+            session_data["conversation_history"].append(message)
+
+            success = await self.store_session(session_id, session_data)
+
+            if success:
+                logger.debug(f"Appended {role} message to session {session_id}")
+
+            return success
+
+        except Exception as e:
+            logger.error(f"Failed to append message to session {session_id}: {e}")
+            return False
+
+    async def get_messages(
+        self,
+        session_id: str,
+        limit: Optional[int] = None,
+        role: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get messages from conversation history.
+
+        Args:
+            session_id: Session identifier
+            limit: Maximum number of messages to return (from most recent)
+            role: Filter by role (optional)
+
+        Returns:
+            List of messages
+        """
+        try:
+            session_data = await self.get_session(session_id)
+            if not session_data:
+                logger.warning(f"Session {session_id} not found")
+                return []
+
+            messages = session_data.get("conversation_history", [])
+
+            # Filter by role if specified
+            if role:
+                messages = [msg for msg in messages if msg.get("role") == role]
+
+            # Apply limit (from most recent)
+            if limit and limit > 0:
+                messages = messages[-limit:]
+
+            logger.debug(f"Retrieved {len(messages)} messages from session {session_id}")
+            return messages
+
+        except Exception as e:
+            logger.error(f"Failed to get messages from session {session_id}: {e}")
+            return []
+
     # Context management
-    
+
     async def get_context(
         self,
-        agent_id: str,
-        session_id: Optional[str] = None,
+        session_id: str,
+        agent_id: Optional[str] = None,
         include_history: bool = True,
         max_messages: int = 50
     ) -> Dict[str, Any]:
         """
-        Get comprehensive context for an agent.
-        
+        Get comprehensive context for a session.
+
         Args:
-            agent_id: Agent identifier
-            session_id: Optional session identifier
+            session_id: Session identifier
+            agent_id: Optional agent identifier (deprecated, kept for compatibility)
             include_history: Whether to include conversation history
             max_messages: Maximum number of messages to include
-            
+
         Returns:
             Context dictionary
         """
         try:
-            context = {
-                "agent_id": agent_id,
-                "session_id": session_id,
-                "current_message": None,
-                "conversation_history": [],
-                "retrieved_knowledge": [],
-                "temporary_variables": {},
-                "agent_state": {},
-                "timestamp": datetime.utcnow().isoformat()
-            }
-            
-            # Get session data if session_id provided
-            if session_id:
-                session_data = await self.get_session(session_id)
-                if session_data:
-                    context.update({
-                        "current_message": session_data.get("current_message"),
-                        "conversation_history": session_data.get("conversation_history", []),
-                        "retrieved_knowledge": session_data.get("retrieved_knowledge", []),
-                        "temporary_variables": session_data.get("temporary_variables", {}),
-                        "agent_state": session_data.get("agent_state", {})
-                    })
-            
-            # Limit conversation history
-            if include_history and context["conversation_history"]:
-                context["conversation_history"] = context["conversation_history"][-max_messages:]
-            
-            logger.debug(f"Retrieved context for agent {agent_id}")
+            session_data = await self.get_session(session_id)
+            if not session_data:
+                logger.warning(f"Session {session_id} not found")
+                return {}
+
+            # Return the context stored in the session
+            context = session_data.get("context", {})
+
+            # Add agent_id if available
+            if "agent_id" not in context and session_data.get("agent_id"):
+                context["agent_id"] = session_data["agent_id"]
+
+            logger.debug(f"Retrieved context for session {session_id}")
             return context
-            
+
         except Exception as e:
-            logger.error(f"Failed to get context for agent {agent_id}: {e}")
-            return {"agent_id": agent_id, "error": str(e)}
+            logger.error(f"Failed to get context for session {session_id}: {e}")
+            return {"error": str(e)}
     
     async def update_context(
         self,
-        agent_id: str,
         session_id: str,
-        updates: Dict[str, Any]
+        context_updates: Dict[str, Any],
+        agent_id: Optional[str] = None
     ) -> bool:
         """
-        Update context for an agent session.
-        
+        Update context for a session.
+
         Args:
-            agent_id: Agent identifier
             session_id: Session identifier
-            updates: Updates to apply
-            
+            context_updates: Context updates to apply
+            agent_id: Optional agent identifier (deprecated, kept for compatibility)
+
         Returns:
             True if successful
         """
@@ -230,41 +346,25 @@ class WorkingMemoryService:
             # Get current session data
             session_data = await self.get_session(session_id)
             if not session_data:
-                session_data = {
-                    "agent_id": agent_id,
-                    "current_message": None,
-                    "conversation_history": [],
-                    "retrieved_knowledge": [],
-                    "temporary_variables": {},
-                    "agent_state": {}
-                }
-            
-            # Apply updates
-            for key, value in updates.items():
-                if key in ["conversation_history", "retrieved_knowledge"]:
-                    # Append to lists
-                    if key not in session_data:
-                        session_data[key] = []
-                    session_data[key].extend(value if isinstance(value, list) else [value])
-                elif key in ["temporary_variables", "agent_state"]:
-                    # Merge dictionaries
-                    if key not in session_data:
-                        session_data[key] = {}
-                    session_data[key].update(value if isinstance(value, dict) else {})
-                else:
-                    # Direct assignment
-                    session_data[key] = value
-            
+                raise Exception(f"Session {session_id} not found")
+
+            # Get current context
+            if "context" not in session_data:
+                session_data["context"] = {}
+
+            # Update context with new values
+            session_data["context"].update(context_updates)
+
             # Store updated session
             success = await self.store_session(session_id, session_data)
-            
+
             if success:
-                logger.debug(f"Updated context for agent {agent_id}, session {session_id}")
-            
+                logger.debug(f"Updated context for session {session_id}")
+
             return success
-            
+
         except Exception as e:
-            logger.error(f"Failed to update context for agent {agent_id}: {e}")
+            logger.error(f"Failed to update context for session {session_id}: {e}")
             return False
     
     # RAG caching

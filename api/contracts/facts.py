@@ -6,11 +6,12 @@ Facts represent personal information about users with full version history.
 """
 
 from datetime import datetime
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, validator
 
-from .common import (
+from api.contracts.common import (
     BaseRequest,
     BaseResponse,
     PaginationRequest,
@@ -20,7 +21,7 @@ from .common import (
 )
 
 
-class FactType(str, BaseModel):
+class FactType(str, Enum):
     """Type of user fact."""
     PERSONAL = "personal"        # Name, age, etc.
     LOCATION = "location"        # City, country, etc.

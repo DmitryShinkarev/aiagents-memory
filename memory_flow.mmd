@@ -1,0 +1,29 @@
+%%{init: {'theme': 'neutral', 'flowchart': {'curve': 'basis'}}}%%
+flowchart LR
+    subgraph Inputs
+        Cues["User cues / sensor data"]
+        Tools["External tools & APIs"]
+    end
+
+    Cues -->|context| WM[Working Memory<br/>Redis]
+    Tools -->|results| WM
+
+    WM -->|persist important<br/>episodes| EM[Episodic Memory<br/>MongoDB + Qdrant]
+    WM -->|immediate facts| Facts[User Facts<br/>MongoDB]
+    EM -->|evidence links| Facts
+
+    subgraph Consolidation
+        Facts -->|conflict resolution| Sem[Semantic Memory<br/>MongoDB + Qdrant]
+        EM -->|distillation + temporal scoring| Sem
+        Sem -->|knowledge graph updates| Facts
+    end
+
+    Sem -->|generalized instructions| Proc[Procedural Memory<br/>MongoDB]
+    EM -->|trajectory examples| Proc
+    Proc -->|executable skills<br/>(code + parameters)| Exec[Skill Runner / Agents]
+    Exec -->|feedback metrics| WM
+    Exec -->|execution traces| EM
+
+    Sem -->|context retrieval| WM
+    Facts -->|personalization| WM
+

@@ -12,9 +12,9 @@ from typing import Any, Dict, List, Optional, Union
 
 from bson import ObjectId
 
-from ...storage.clients.mongo_client import get_mongo_client
-from ...config.settings import get_settings
-from ...api.contracts.facts import SourceType
+from storage.clients.mongo_client import get_mongo_client
+from config.settings import get_settings
+from api.contracts.facts import SourceType
 
 logger = logging.getLogger(__name__)
 
@@ -609,3 +609,242 @@ class FactsService:
                 "error": str(e),
                 "timestamp": datetime.utcnow().isoformat()
             }
+
+    # Knowledge Graph Methods (Entities, Relations, Facts)
+
+    async def create_entity(
+        self,
+        entity_id: str,
+        entity_type: str,
+        name: str,
+        agent_id: str,
+        attributes: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """
+        Create an entity in the knowledge graph.
+
+        Args:
+            entity_id: Unique entity identifier
+            entity_type: Type of entity (person, system, component, etc.)
+            name: Entity name
+            agent_id: Agent identifier
+            attributes: Entity attributes
+            metadata: Additional metadata
+
+        Returns:
+            Created entity ID
+        """
+        try:
+            mongo_client = await self._get_mongo_client()
+
+            entity_doc = {
+                "entity_id": entity_id,
+                "entity_type": entity_type,
+                "name": name,
+                "agent_id": agent_id,
+                "attributes": attributes or {},
+                "metadata": metadata or {},
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
+
+            await mongo_client.insert_one("entities", entity_doc)
+
+            logger.info(f"Created entity {entity_id} ({name})")
+            return entity_id
+
+        except Exception as e:
+            logger.error(f"Failed to create entity {entity_id}: {e}")
+            raise
+
+    async def create_relation(
+        self,
+        source_entity_id: str,
+        relation_type: str,
+        target_entity_id: str,
+        agent_id: str,
+        properties: Optional[Dict[str, Any]] = None,
+        confidence: float = 1.0
+    ) -> str:
+        """
+        Create a relation between entities.
+
+        Args:
+            source_entity_id: Source entity ID
+            relation_type: Type of relation (uses, contains, etc.)
+            target_entity_id: Target entity ID
+            agent_id: Agent identifier
+            properties: Relation properties
+            confidence: Confidence level
+
+        Returns:
+            Created relation ID
+        """
+        try:
+            mongo_client = await self._get_mongo_client()
+
+            relation_id = f"{source_entity_id}_{relation_type}_{target_entity_id}"
+            relation_doc = {
+                "relation_id": relation_id,
+                "source_entity_id": source_entity_id,
+                "relation_type": relation_type,
+                "target_entity_id": target_entity_id,
+                "agent_id": agent_id,
+                "properties": properties or {},
+                "confidence": confidence,
+                "created_at": datetime.utcnow()
+            }
+
+            await mongo_client.insert_one("relations", relation_doc)
+
+            logger.info(f"Created relation: {source_entity_id} -> {relation_type} -> {target_entity_id}")
+            return relation_id
+
+        except Exception as e:
+            logger.error(f"Failed to create relation: {e}")
+            raise
+
+    async def create_fact(
+        self,
+        entity_id: str,
+        attribute: str,
+        value: Any,
+        agent_id: str,
+        confidence: float = 1.0,
+        source: str = "user"
+    ) -> str:
+        """
+        Create a fact about an entity.
+
+        Args:
+            entity_id: Entity identifier
+            attribute: Attribute name
+            value: Attribute value
+            agent_id: Agent identifier
+            confidence: Confidence level
+            source: Fact source
+
+        Returns:
+            Created fact ID
+        """
+        try:
+            mongo_client = await self._get_mongo_client()
+
+            fact_id = f"{entity_id}_{attribute}"
+            fact_doc = {
+                "fact_id": fact_id,
+                "entity_id": entity_id,
+                "attribute": attribute,
+                "value": value,
+                "agent_id": agent_id,
+                "confidence": confidence,
+                "source": source,
+                "created_at": datetime.utcnow()
+            }
+
+            await mongo_client.insert_one("entity_facts", fact_doc)
+
+            logger.info(f"Created fact: {entity_id}.{attribute} = {value}")
+            return fact_id
+
+        except Exception as e:
+            logger.error(f"Failed to create fact: {e}")
+            raise
+
+    async def get_entity(
+        self,
+        entity_id: str,
+        include_relations: bool = False,
+        include_facts: bool = False
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get entity with optional relations and facts.
+
+        Args:
+            entity_id: Entity identifier
+            include_relations: Include related entities
+            include_facts: Include entity facts
+
+        Returns:
+            Entity data or None
+        """
+        try:
+            mongo_client = await self._get_mongo_client()
+
+            entity = await mongo_client.find_one(
+                "entities",
+                {"entity_id": entity_id}
+            )
+
+            if not entity:
+                return None
+
+            entity["_id"] = str(entity["_id"])
+
+            if include_relations:
+                relations = await mongo_client.find_many(
+                    "relations",
+                    {"source_entity_id": entity_id}
+                )
+                entity["relations"] = relations
+
+            if include_facts:
+                facts = await mongo_client.find_many(
+                    "entity_facts",
+                    {"entity_id": entity_id}
+                )
+                entity["facts"] = facts
+
+            return entity
+
+        except Exception as e:
+            logger.error(f"Failed to get entity {entity_id}: {e}")
+            return None
+
+    async def query_relations(
+        self,
+        agent_id: Optional[str] = None,
+        source_entity_id: Optional[str] = None,
+        relation_type: Optional[str] = None,
+        target_entity_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Query relations with filters.
+
+        Args:
+            agent_id: Filter by agent ID
+            source_entity_id: Filter by source entity
+            relation_type: Filter by relation type
+            target_entity_id: Filter by target entity
+
+        Returns:
+            List of relations
+        """
+        try:
+            mongo_client = await self._get_mongo_client()
+
+            query = {}
+            if agent_id:
+                query["agent_id"] = agent_id
+            if source_entity_id:
+                query["source_entity_id"] = source_entity_id
+            if relation_type:
+                query["relation_type"] = relation_type
+            if target_entity_id:
+                query["target_entity_id"] = target_entity_id
+
+            relations = await mongo_client.find_many("relations", query)
+
+            for relation in relations:
+                relation["_id"] = str(relation["_id"])
+
+            return relations
+
+        except Exception as e:
+            logger.error(f"Failed to query relations: {e}")
+            return []
+
+
+# Alias for consistency with naming pattern
+FactsMemoryService = FactsService

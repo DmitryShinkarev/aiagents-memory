@@ -18,7 +18,7 @@ from qdrant_client.models import (
     MatchValue, Range, SearchRequest, ScrollRequest, CountRequest
 )
 
-from ...config.settings import get_settings
+from config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 

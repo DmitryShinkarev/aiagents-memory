@@ -12,8 +12,8 @@ from typing import Any, Dict, List, Optional, Union
 
 from bson import ObjectId
 
-from ...storage.clients.mongo_client import get_mongo_client
-from ...config.settings import get_settings
+from storage.clients.mongo_client import get_mongo_client
+from config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -103,44 +103,208 @@ class ProceduralMemoryService:
         except Exception as e:
             logger.error(f"Failed to store procedure {name}: {e}")
             raise
-    
+
+    async def create_procedure(
+        self,
+        procedure_id: str,
+        name: str,
+        description: str,
+        agent_id: str,
+        steps: List[Dict[str, Any]],
+        tags: Optional[List[str]] = None,
+        initial_success_rate: float = 1.0,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """
+        Create a procedure with simplified parameters (notebook-compatible).
+
+        Args:
+            procedure_id: Unique procedure identifier
+            name: Procedure name
+            description: Procedure description
+            agent_id: Agent identifier
+            steps: List of procedure steps (each with step_number, action, description, parameters)
+            tags: Procedure tags
+            initial_success_rate: Initial success rate estimate
+            metadata: Additional metadata
+
+        Returns:
+            Created procedure ID
+        """
+        try:
+            mongo_client = await self._get_mongo_client()
+
+            # Check if procedure with same name already exists
+            existing = await mongo_client.find_one(
+                "procedures",
+                {"procedure_id": procedure_id}
+            )
+
+            if existing:
+                logger.warning(f"Procedure {procedure_id} already exists, returning existing ID")
+                return str(existing["_id"])
+
+            # Create procedure document with simplified structure
+            procedure_doc = {
+                "procedure_id": procedure_id,
+                "name": name,
+                "description": description,
+                "agent_id": agent_id,
+                "steps": steps,
+                "tags": tags or [],
+                "created_at": datetime.utcnow(),
+                "active": True,
+                "execution_count": 0,
+                "success_count": 0,
+                "success_rate": initial_success_rate,
+                "avg_execution_time_ms": 0.0,
+                "total_execution_time_ms": 0.0,
+                "last_executed_at": None,
+                "metadata": metadata or {}
+            }
+
+            # Insert into MongoDB
+            inserted_id = await mongo_client.insert_one("procedures", procedure_doc)
+
+            logger.info(f"Created procedure {name} with ID {procedure_id}")
+            return procedure_id
+
+        except Exception as e:
+            logger.error(f"Failed to create procedure {name}: {e}")
+            raise
+
+    async def record_execution(
+        self,
+        procedure_id: str,
+        success: bool,
+        execution_time_ms: float,
+        context: Optional[Dict[str, Any]] = None,
+        outcome: Optional[str] = None,
+        error: Optional[str] = None
+    ) -> str:
+        """
+        Record an execution of a procedure.
+
+        Args:
+            procedure_id: Procedure identifier
+            success: Whether execution was successful
+            execution_time_ms: Execution time in milliseconds
+            context: Execution context
+            outcome: Execution outcome description
+            error: Error message if failed
+
+        Returns:
+            Execution ID
+        """
+        try:
+            mongo_client = await self._get_mongo_client()
+
+            # Find the procedure
+            procedure = await mongo_client.find_one(
+                "procedures",
+                {"procedure_id": procedure_id}
+            )
+
+            if not procedure:
+                raise ValueError(f"Procedure {procedure_id} not found")
+
+            # Create execution record
+            execution_id = f"{procedure_id}_exec_{datetime.utcnow().timestamp()}"
+            execution_doc = {
+                "execution_id": execution_id,
+                "procedure_id": procedure_id,
+                "success": success,
+                "execution_time_ms": execution_time_ms,
+                "context": context or {},
+                "outcome": outcome,
+                "error": error,
+                "executed_at": datetime.utcnow()
+            }
+
+            # Update procedure metrics
+            execution_count = procedure.get("execution_count", 0) + 1
+            success_count = procedure.get("success_count", 0) + (1 if success else 0)
+            total_time = procedure.get("total_execution_time_ms", 0.0) + execution_time_ms
+
+            updates = {
+                "$set": {
+                    "execution_count": execution_count,
+                    "success_count": success_count,
+                    "success_rate": success_count / execution_count if execution_count > 0 else 0.0,
+                    "avg_execution_time_ms": total_time / execution_count if execution_count > 0 else 0.0,
+                    "total_execution_time_ms": total_time,
+                    "last_executed_at": datetime.utcnow()
+                },
+                "$push": {"executions": {"$each": [execution_doc], "$slice": -100}}  # Keep last 100
+            }
+
+            await mongo_client.update_one(
+                "procedures",
+                {"procedure_id": procedure_id},
+                updates
+            )
+
+            logger.debug(f"Recorded execution for procedure {procedure_id}")
+            return execution_id
+
+        except Exception as e:
+            logger.error(f"Failed to record execution for procedure {procedure_id}: {e}")
+            raise
+
     async def get_procedure(
         self,
-        name: str,
-        include_code: bool = True
+        procedure_id: Optional[str] = None,
+        name: Optional[str] = None,
+        include_code: bool = True,
+        include_executions: bool = False
     ) -> Optional[Dict[str, Any]]:
         """
-        Get procedure by name.
-        
+        Get procedure by ID or name.
+
         Args:
+            procedure_id: Procedure identifier (takes precedence)
             name: Procedure name
             include_code: Whether to include code in response
-            
+            include_executions: Whether to include execution history
+
         Returns:
             Procedure data or None if not found
         """
         try:
             mongo_client = await self._get_mongo_client()
-            
+
+            # Build query
+            if procedure_id:
+                query = {"procedure_id": procedure_id}
+            elif name:
+                query = {"name": name, "active": True}
+            else:
+                raise ValueError("Either procedure_id or name must be provided")
+
             projection = None
             if not include_code:
                 projection = {"code": 0}
-            
+
             procedure = await mongo_client.find_one(
                 "procedures",
-                {"name": name, "active": True},
+                query,
                 projection
             )
-            
+
             if procedure:
                 # Convert ObjectId to string
                 procedure["_id"] = str(procedure["_id"])
-                logger.debug(f"Retrieved procedure {name}")
-            
+
+                # Add executions if requested and not present
+                if include_executions and "executions" not in procedure:
+                    procedure["executions"] = []
+
+                logger.debug(f"Retrieved procedure {procedure_id or name}")
+
             return procedure
-            
+
         except Exception as e:
-            logger.error(f"Failed to get procedure {name}: {e}")
+            logger.error(f"Failed to get procedure {procedure_id or name}: {e}")
             return None
     
     async def get_procedure_by_id(
@@ -547,11 +711,12 @@ class ProceduralMemoryService:
         sort_by: str = "usage_count",
         sort_order: str = "desc",
         limit: int = 50,
-        offset: int = 0
+        offset: int = 0,
+        agent_id: Optional[str] = None  # Add agent_id filter
     ) -> List[Dict[str, Any]]:
         """
         Query procedures with various filters.
-        
+
         Args:
             filter_by_tags: Filter by tags
             filter_by_language: Filter by language
@@ -561,13 +726,17 @@ class ProceduralMemoryService:
             sort_order: Sort order (asc/desc)
             limit: Maximum number of results
             offset: Number of results to skip
-            
+            agent_id: Filter by agent ID
+
         Returns:
             List of procedures
         """
         try:
             # Build MongoDB filter
             mongo_filter = {"active": True}
+
+            if agent_id:
+                mongo_filter["agent_id"] = agent_id
             
             if filter_by_tags:
                 mongo_filter["tags"] = {"$in": filter_by_tags}

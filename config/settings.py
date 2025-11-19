@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     redis_max_connections: int = 50
     
     # MongoDB Configuration
-    mongodb_url: str = "mongodb://localhost:27017"
+    mongodb_url: str = "mongodb://admin:password@localhost:27017"
     mongodb_database: str = "agent_memory"
     mongodb_max_pool_size: int = 100
     

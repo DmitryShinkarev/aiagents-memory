@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, ValidationError as PydanticValidationError
 
-from ..api.contracts.common import (
+from api.contracts.common import (
     APIVersion,
     MemoryScope,
     EpisodeScope,
@@ -23,10 +23,10 @@ from ..api.contracts.common import (
     UpdateOperation,
     ValidationRule
 )
-from ..api.contracts.entity import UniversalEntityWriteRequest, UniversalEntityUpdateRequest
-from ..api.contracts.episode import UniversalEpisodeWriteRequest
-from ..api.contracts.knowledge import UniversalKnowledgeWriteRequest
-from ..api.contracts.facts import UniversalFactWriteRequest
+from api.contracts.entity import UniversalEntityWriteRequest, UniversalEntityUpdateRequest
+from api.contracts.episode import UniversalEpisodeWriteRequest
+from api.contracts.knowledge import UniversalKnowledgeWriteRequest
+from api.contracts.facts import UniversalFactWriteRequest
 
 logger = logging.getLogger(__name__)
 

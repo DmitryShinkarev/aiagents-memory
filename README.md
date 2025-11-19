@@ -411,6 +411,8 @@ memory-agents/
 │   └── clients/       # Database clients
 ├── config/            # Configuration
 ├── examples/         # Usage examples
+│   ├── notebooks/     # Interactive notebooks
+│   └── memory_usage_example.py
 ├── docs/            # Documentation
 └── scripts/        # Database initialization
 ```
@@ -445,6 +447,7 @@ memory-agents/
 
 See the `examples/` directory for comprehensive usage examples:
 
+- `examples/notebooks/demo_memory_agents.ipynb`: Interactive Jupyter notebook demonstrating the system
 - `memory_usage_example.py`: Complete example showing all memory types
 - Basic operations for each memory type
 - Multi-agent coordination examples

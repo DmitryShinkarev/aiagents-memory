@@ -10,7 +10,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from .contracts.common import APIVersion
+from api.contracts.common import APIVersion
 
 
 class VersionCompatibility(str, Enum):

@@ -50,6 +50,7 @@ class EpisodeType(str, Enum):
     """Type of episode."""
     INTERACTION = "interaction"
     TASK_EXECUTION = "task_execution"
+    TASK = "task_execution"  # Alias for backward compatibility
     COLLABORATION = "collaboration"
     LEARNING = "learning"
     ERROR = "error"
@@ -67,7 +68,9 @@ class EpisodeStatus(str, Enum):
 class SourceType(str, Enum):
     """Source of knowledge or fact."""
     USER_STATED = "user_stated"
+    USER_PROVIDED = "user_stated"  # Alias for backward compatibility
     INFERRED = "inferred"
+    LEARNED = "inferred"  # Alias for backward compatibility
     OBSERVED = "observed"
     CONSOLIDATED = "consolidated"
     SYSTEM = "system"

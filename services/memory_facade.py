@@ -10,11 +10,11 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from ..domain.memory.working import WorkingMemoryService
-from ..domain.memory.episodic import EpisodicMemoryService
-from ..domain.memory.semantic import SemanticMemoryService
-from ..domain.memory.procedural import ProceduralMemoryService
-from ..domain.memory.facts import FactsService
+from domain.memory.working import WorkingMemoryService
+from domain.memory.episodic import EpisodicMemoryService
+from domain.memory.semantic import SemanticMemoryService
+from domain.memory.procedural import ProceduralMemoryService
+from domain.memory.facts import FactsService
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +96,7 @@ class MemoryFacade:
         embedding: Optional[List[float]] = None
     ) -> str:
         """Create a new episode."""
-        from ..api.contracts.episode import EpisodeContext, EpisodeTrajectory, EpisodeScope, EpisodeType, EpisodeStatus
+        from api.contracts.episode import EpisodeContext, EpisodeTrajectory, EpisodeScope, EpisodeType, EpisodeStatus
         
         # Convert context
         episode_context = EpisodeContext(
@@ -170,7 +170,7 @@ class MemoryFacade:
         offset: int = 0
     ) -> List[Dict[str, Any]]:
         """Query episodes with various filters."""
-        from ..api.contracts.episode import EpisodeScope, EpisodeType, EpisodeStatus
+        from api.contracts.episode import EpisodeScope, EpisodeType, EpisodeStatus
         
         # Convert string enums to enum objects
         scope_enums = [EpisodeScope(s) for s in filter_by_scope] if filter_by_scope else None
@@ -216,7 +216,7 @@ class MemoryFacade:
         allowed_agents: Optional[List[str]] = None
     ) -> str:
         """Create new knowledge item."""
-        from ..api.contracts.knowledge import SourceType
+        from api.contracts.knowledge import SourceType
         
         return await self.semantic.create_knowledge(
             knowledge_id=knowledge_id,
@@ -336,7 +336,7 @@ class MemoryFacade:
         force_update: bool = False
     ) -> str:
         """Store or update a user fact."""
-        from ..api.contracts.facts import SourceType
+        from api.contracts.facts import SourceType
         
         return await self.facts.store_fact(
             fact_id=fact_id,
