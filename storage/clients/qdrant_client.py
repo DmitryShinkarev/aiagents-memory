@@ -116,11 +116,12 @@ class QdrantClient:
             if collection_name not in existing_collections:
                 await asyncio.get_event_loop().run_in_executor(
                     None,
-                    self._client.create_collection,
-                    collection_name=collection_name,
-                    vectors_config=VectorParams(
-                        size=vector_size,
-                        distance=distance
+                    lambda: self._client.create_collection(
+                        collection_name=collection_name,
+                        vectors_config=VectorParams(
+                            size=vector_size,
+                            distance=distance
+                        )
                     )
                 )
                 logger.info(f"Created Qdrant collection: {collection_name}")
@@ -188,11 +189,12 @@ class QdrantClient:
         
         await asyncio.get_event_loop().run_in_executor(
             None,
-            self._client.create_collection,
-            collection_name=collection_name,
-            vectors_config=VectorParams(
-                size=vector_size,
-                distance=distance
+            lambda: self._client.create_collection(
+                collection_name=collection_name,
+                vectors_config=VectorParams(
+                    size=vector_size,
+                    distance=distance
+                )
             )
         )
     
@@ -264,11 +266,12 @@ class QdrantClient:
         
         points = await asyncio.get_event_loop().run_in_executor(
             None,
-            self._client.retrieve,
-            collection_name,
-            ids,
-            with_payload=with_payload,
-            with_vectors=with_vectors
+            lambda: self._client.retrieve(
+                collection_name,
+                ids,
+                with_payload=with_payload,
+                with_vectors=with_vectors
+            )
         )
         
         return [
